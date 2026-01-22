@@ -1,0 +1,2 @@
+# Analysis Scripts for "Flux Eruptions in Wind-fed Sgr A* Accretion"
+This repository contains the analysis scripts for my project analysing wind-fed accretion flows on Sagittarius A* (paper in prep. for MNRAS).
