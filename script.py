@@ -542,8 +542,7 @@ ax[2].plot(t,100*Edot[:,ir5]/np.abs(mdot[:,ir2]), color='black')
 ax[2].set_yscale('log')
 ax[2].set_ylabel(r'$\eta$ [%]')
 ax[2].set_xlabel('Time t (in M)')
-
-fig.suptitle(r'$\beta=10^2,a=0$')
+fig.suptitle(r'Standard MAD')
 # ax[0].axvline(t[2651], color='black', ls='--', alpha=0.4)
 # ax[1].axvline(t[2651], color='black', ls='--', alpha=0.4)
 # ax[2].axvline(t[2651], color='black', ls='--', alpha=0.4)
@@ -799,6 +798,10 @@ for i in range(len(peaks20)):
         continue
     else:
         data['nonmad']['beta2_a0']['del_t'].append(t[peaks20[i]]-t[troughs20[i-1]])
+        
+peaksm = 
+troughsm = 
+peaks, props = find_peaks(Phibh[:,ir2])
 
 for i in range(len(vars2)):
     for j in range(len(vars2)):
