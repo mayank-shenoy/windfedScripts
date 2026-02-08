@@ -19,6 +19,7 @@ from skimage.morphology import skeletonize
 import networkx as netx
 from skan import Skeleton, summarize
 from scipy.signal import find_peaks, peak_widths, peak_prominences
+from scipy.stats import gaussian_kde
 
 #=========================================================================================
 
@@ -1376,6 +1377,240 @@ def yt_extract_box(i_dump,box_radius = 0.5,mhd=True,gr=False,a=0.0,res=128,cente
   if (('athena_pp','r3') in ds.field_list ): 
     ke_ent3 = np.array(region['r3'])
 
+def yt_extract_box_rotated(i_dump,box_radius = 0.5,mhd=True,gr=False,a=0.0,res=128,center_x=0.0,center_y=0.0,center_z=0.0,uov=False,orbit_file=None,t0=0,xbox_radius=None,ybox_radius=None,zbox_radius=None,slice=False,th_tilt=0,phi_tilt=0,resx=None,resy=None,resz=None):
+  global region,x,y,z,rho,press,vel1,vel2,vel3,Bcc1,Bcc2,Bcc3,bsq,vsq,uu,bsq,bu,bd
+  global gamma
+  global nx,ny,nz
+  global uov1,uov2,uov3,uov4, uov0,uov5,uov6
+  yt_load(i_dump,gr=gr,a=a)
+  if (resx is None): resx = res
+  if (resy is None): resy = res 
+  if (resz is None): resz = res
+ 
+  # yt_extract_box(i_dump,box_radius = box_radius,mhd=True,gr=gr,a=a,res=res,center_x=center_x,center_y=center_y,center_z=center_z,uov=uov,orbit_file=orbit_file,t0=t0,xbox_radius=xbox_radius,ybox_radius=ybox_radius,zbox_radius=zbox_radius)
+  t = np.array(ds.current_time)
+  #rd_binary_orbits(orbit_file)
+  #get_binary_quantities(t,t0)
+  ph = phi_tilt
+  th = th_tilt
+  #unit vectors for the new coordinate system in the frame of the old coordinates
+  z_hat = np.array([sin(th)*cos(ph),sin(th)*sin(ph),cos(th)])   #r
+  x_hat = np.array([cos(th)*cos(ph),cos(th)*sin(ph),-sin(th)])  #theta
+  y_hat = np.array([-sin(ph),cos(ph),0])                        #phi
+  #unit vectors for original coordinate system in the frame of the new coordinates
+  #r_vec_old = x_old x_hat_prime + y_old y_hat_prime + z_old z_hat_prime 
+  x_hat_prime = [np.cos(th)*np.cos(ph),-np.sin(ph),np.sin(th)*np.cos(ph)]   #in terms of [theta_hat, phi_hat, r_hat] 
+  y_hat_prime = [np.cos(th)*np.sin(ph),np.cos(ph),np.sin(th)*np.sin(ph)]
+  z_hat_prime = [-np.sin(th),0,np.cos(th)]
+  centerx_tmp,centery_tmp,centerz_tmp = 1.0*center_x, 1.0*center_y, 1.0*center_z
+  center_x = centerx_tmp * x_hat_prime[0] + centery_tmp * y_hat_prime[0] + centerz_tmp * z_hat_prime[0]
+  center_y = centerx_tmp * x_hat_prime[1] + centery_tmp * y_hat_prime[1] + centerz_tmp * z_hat_prime[1]
+  center_z = centerx_tmp * x_hat_prime[2] + centery_tmp * y_hat_prime[2] + centerz_tmp * z_hat_prime[2]
+  index = np.arange(ds.r['rho'].shape[0])
+  #faces
+  new_x = np.linspace(-box_radius+center_x,box_radius+center_x,resx+1)
+  if (slice==False): new_y = np.linspace(-box_radius+center_y,box_radius+center_y,resy+1)
+  else: new_y = np.array([center_y])
+  new_z = np.linspace(-box_radius+center_z,box_radius+center_z,resz+1)
+  dx = np.diff(new_x)[0]
+  if (slice==False):
+    dy = np.diff(new_y)[0]
+    new_y = (new_y + dy/2.0)[:-1]
+  dz = np.diff(new_z)[0]
+  new_x = (new_x + dx/2.0)[:-1]
+  new_z = (new_z + dz/2.0)[:-1]
+  new_x,new_y,new_z = np.meshgrid(new_x,new_y,new_z,indexing='ij')
+  xi = new_x * x_hat[0] + new_y * y_hat[0] + new_z * z_hat[0]
+  yi = new_x * x_hat[1] + new_y * y_hat[1] + new_z * z_hat[1]
+  zi = new_x * x_hat[2] + new_y * y_hat[2] + new_z * z_hat[2]
+  # if (slice==False):
+  new_index = scipy.interpolate.griddata((ds.r['x'],ds.r['y'],ds.r['z']),index,(xi,yi,zi),method = "nearest",fill_value = 0).astype(np.int64)
+  # else:   new_index = scipy.interpolate.griddata((ds.r['x'],ds.r['y'],ds.r['z']),index,(xi,yi,zi),method = "linear",fill_value = 0)
+  x = new_x * 1.0
+  y = new_y * 1.0
+  z = new_z * 1.0
+  # rho = ds.['rho'][new_index]*1.0 
+  # press = ds.['press'].flatten()[new_index] * 1.0
+  # vel1 = ds.['vel1'].flatten()[new_index] * 1.0
+  # vel2 = ds.['vel2'].flatten()[new_index] * 1.0
+  # vel3 = ds.['vel3'].flatten()[new_index] * 1.0
+  # uu[0] = uu[0].flatten()[new_index] * 1.0
+  # uu[1] = uu[1].flatten()[new_index] * 1.0
+  # uu[2] = uu[2].flatten()[new_index] * 1.0
+  # uu[3] = uu[3].flatten()[new_index] * 1.0
+  # bu[0] = bu[0].flatten()[new_index] * 1.0
+  # bu[1] = bu[1].flatten()[new_index] * 1.0
+  # bu[2] = bu[2].flatten()[new_index] * 1.0
+  # bu[3] = bu[3].flatten()[new_index] * 1.0
+  # bsq = bsq.flatten()[new_index] * 1.0
+  from yt.units import pc, msun,kyr
+  rho = np.array(ds.r['density'][(new_index)] * pc**3/msun)
+  press = np.array(ds.r['press'][(new_index)] * pc**3/msun * kyr**2/pc**2)
+  vel1 = np.array(ds.r['vel1'][(new_index)] * kyr/pc)
+  vel2 = np.array(ds.r['vel2'][(new_index)] * kyr/pc)
+  vel3 = np.array(ds.r['vel3'][(new_index)] * kyr/pc)
+  global uu,bu,bsq
+  uu = [0,0,0,0]
+  bu = [0,0,0,0]
+  cks_metric(xi,yi,zi,0,0,a)
+  tmp = g[1,1]*vel1*vel1 + 2.0*g[1,2]*vel1*vel2 + 2.0*g[1,3]*vel1*vel3+ g[2,2]*vel2*vel2 + 2.0*g[2,3]*vel2*vel3+ g[3,3]*vel3*vel3;
+  gamma = np.sqrt(1.0 + tmp);
+  # Calculate 4-velocity
+  #invert_metric(g)
+  invert_metric(g)
+  alpha = np.sqrt(-1.0/gi[0,0]);
+  uu[0] = gamma/alpha;
+  uu[1] = vel1 - alpha * gamma * gi[0,1];
+  uu[2] = vel2 - alpha * gamma * gi[0,2];
+  uu[3] = vel3 - alpha * gamma * gi[0,3];
+# uu[0] = ds2.r['user_out_var1'][new_index]
+# uu[1] = ds2.r['user_out_var2'][new_index]
+# uu[2] = ds2.r['user_out_var3'][new_index]
+# uu[3] = ds2.r['user_out_var4'][new_index]
+  uu = np.array(uu)
+  uu_tmp = uu*1.0
+  
+  B_unit = pc/kyr * np.sqrt(4. * np.pi * msun/pc**3 ) 
+  Bcc1 = np.array(ds.r['Bcc1'][new_index]/B_unit)
+  Bcc2 = np.array(ds.r['Bcc2'][new_index]/B_unit)
+  Bcc3 = np.array(ds.r['Bcc3'][new_index]/B_unit)
+  B_vec = np.zeros(uu.shape)
+  B_vec[1] = Bcc1 
+  B_vec[2] = Bcc2 
+  B_vec[3] = Bcc3
+  # cks_metric(xi,yi,zi,ax,ay,az)  // No need to call again
+  for i in range(1,4):
+    for mu in range(0,4):
+      bu[0] += g[i,mu]*uu[mu]*B_vec[i]
+  bu[1] = 1.0/uu[0] * (B_vec[1] + bu[0]*uu[1])
+  bu[2] = 1.0/uu[0] * (B_vec[2] + bu[0]*uu[2])
+  bu[3] = 1.0/uu[0] * (B_vec[3] + bu[0]*uu[3])
+  bu = np.array(bu)
+  bu_tmp = bu* 1.0
+  bsq = 0
+  for i in range(4):
+    for j in range(4):
+      bsq += g[i,j] * bu[i] * bu[j]
+  uu_tmp = uu * 1.0
+  bu_tmp = bu * 1.0
+  uu[1] = uu_tmp[1] * x_hat_prime[0] + uu_tmp[2] * y_hat_prime[0]  + uu_tmp[3] * z_hat_prime[0]
+  uu[2] = uu_tmp[1] * x_hat_prime[1] + uu_tmp[2] * y_hat_prime[1]  + uu_tmp[3] * z_hat_prime[1]
+  uu[3] = uu_tmp[1] * x_hat_prime[2] + uu_tmp[2] * y_hat_prime[2]  + uu_tmp[3] * z_hat_prime[2]
+  bu[1] = bu_tmp[1] * x_hat_prime[0] + bu_tmp[2] * y_hat_prime[0]  + bu_tmp[3] * z_hat_prime[0]
+  bu[2] = bu_tmp[1] * x_hat_prime[1] + bu_tmp[2] * y_hat_prime[1]  + bu_tmp[3] * z_hat_prime[1]
+  bu[3] = bu_tmp[1] * x_hat_prime[2] + bu_tmp[2] * y_hat_prime[2]  + bu_tmp[3] * z_hat_prime[2]
+  Bcc1 = (bu[1] * uu[0] - bu[0] * uu[1])
+  Bcc2 = (bu[2] * uu[0] - bu[0] * uu[2])
+  Bcc3 = (bu[3] * uu[0] - bu[0] * uu[3])
+  global nx,ny,nz 
+  nx = rho.shape[0]
+  ny = rho.shape[1]
+  nz = rho.shape[2]
+def yt_extract_box_corotating_old(i_dump,box_radius = 0.5,mhd=True,gr=False,a=0.0,res=128,center_x=0.0,center_y=0.0,center_z=0.0,uov=False,orbit_file=None,t0=0,xbox_radius=None,ybox_radius=None,zbox_radius=None,just_rho=False):
+  global region,x,y,z,rho,press,vel1,vel2,vel3,Bcc1,Bcc2,Bcc3,bsq,vsq,uu,bsq,bu,bd
+  global gamma
+  global nx,ny,nz
+  global uov1,uov2,uov3,uov4, uov0,uov5,uov6
+ 
+  yt_extract_box(i_dump,box_radius = box_radius,mhd=True,gr=gr,a=a,res=res,center_x=center_x,center_y=center_y,center_z=center_z,uov=uov,orbit_file=orbit_file,t0=t0,xbox_radius=xbox_radius,ybox_radius=ybox_radius,zbox_radius=zbox_radius)
+  t = np.array(ds.current_time)
+  rd_binary_orbits(orbit_file)
+  get_binary_quantities(t,t0)
+  ph = arctan2(y2,x2)
+  th = 0;
+  #unit vectors for the new coordinate system in the frame of the old coordinates
+  z_hat = np.array([sin(th)*cos(ph),sin(th)*sin(ph),cos(th)])   #r
+  x_hat = np.array([cos(th)*cos(ph),cos(th)*sin(ph),-sin(th)])  #theta
+  y_hat = np.array([-sin(ph),cos(ph),0])                        #phi
+  #unit vectors for original coordinate system in the frame of the new coordinates
+  #r_vec_old = x_old x_hat_prime + y_old y_hat_prime + z_old z_hat_prime 
+  x_hat_prime = [np.cos(th)*np.cos(ph),-np.sin(ph),np.sin(th)*np.cos(ph)]   #in terms of [theta_hat, phi_hat, r_hat] 
+  y_hat_prime = [np.cos(th)*np.sin(ph),np.cos(ph),np.sin(th)*np.sin(ph)]
+  z_hat_prime = [-np.sin(th),0,np.cos(th)]
+  centerx_tmp,centery_tmp,centerz_tmp = 1.0*center_x, 1.0*center_y, 1.0*center_z
+  center_x = centerx_tmp * x_hat_prime[0] + centery_tmp * y_hat_prime[0] + centerz_tmp * z_hat_prime[0]
+  center_y = centerx_tmp * x_hat_prime[1] + centery_tmp * y_hat_prime[1] + centerz_tmp * z_hat_prime[1]
+  center_z = centerx_tmp * x_hat_prime[2] + centery_tmp * y_hat_prime[2] + centerz_tmp * z_hat_prime[2] 
+  index = np.arange(rho.flatten().shape[0])
+  #faces
+  new_x = np.linspace(-box_radius+center_x,box_radius+center_x,nx+1)
+  new_y = np.linspace(-box_radius+center_y,box_radius+center_y,ny+1)
+  new_z = np.linspace(-box_radius+center_z,box_radius+center_z,nz+1)
+  dx = np.diff(new_x)[0]
+  dy = np.diff(new_y)[0]
+  dz = np.diff(new_z)[0]
+  new_x = (new_x + dx/2.0)[:-1]
+  new_y = (new_y + dy/2.0)[:-1]
+  new_z = (new_z + dz/2.0)[:-1]
+  new_x,new_y,new_z = np.meshgrid(new_x,new_y,new_z,indexing='ij')
+  xi = new_x * x_hat[0] + new_y * y_hat[0] + new_z * z_hat[0]
+  yi = new_x * x_hat[1] + new_y * y_hat[1] + new_z * z_hat[1]
+  zi = new_x * x_hat[2] + new_y * y_hat[2] + new_z * z_hat[2]
+  from scipy.interpolate import RegularGridInterpolator
+  points_to_interpolate = np.vstack([xi.ravel(), yi.ravel(), zi.ravel()]).T  # Shape (N, 3)
+  interp = RegularGridInterpolator((x[:,0,0], y[0,:,0],z[0,0,:]), rho,bounds_error=False, fill_value=None,method='linear')
+  rho = interp(points_to_interpolate).reshape(xi.shape)
+  if (just_rho==False):
+    interp = RegularGridInterpolator((x[:,0,0], y[0,:,0],z[0,0,:]), press,bounds_error=False, fill_value=None,method='linear')
+    press = interp(points_to_interpolate).reshape(xi.shape)
+    interp = RegularGridInterpolator((x[:,0,0], y[0,:,0],z[0,0,:]), vel1,bounds_error=False, fill_value=None,method='linear')
+    vel1 = interp(points_to_interpolate).reshape(xi.shape)
+    interp = RegularGridInterpolator((x[:,0,0], y[0,:,0],z[0,0,:]), vel2,bounds_error=False, fill_value=None,method='linear')
+    vel2 = interp(points_to_interpolate).reshape(xi.shape)
+    interp = RegularGridInterpolator((x[:,0,0], y[0,:,0],z[0,0,:]), vel3,bounds_error=False, fill_value=None,method='linear')
+    vel3 = interp(points_to_interpolate).reshape(xi.shape)
+    interp = RegularGridInterpolator((x[:,0,0], y[0,:,0],z[0,0,:]), uu[0],bounds_error=False, fill_value=None,method='linear')
+    uu[0] = interp(points_to_interpolate).reshape(xi.shape)
+    interp = RegularGridInterpolator((x[:,0,0], y[0,:,0],z[0,0,:]), uu[1],bounds_error=False, fill_value=None,method='linear')
+    uu[1] = interp(points_to_interpolate).reshape(xi.shape)
+    interp = RegularGridInterpolator((x[:,0,0], y[0,:,0],z[0,0,:]), uu[2],bounds_error=False, fill_value=None,method='linear')
+    uu[2] = interp(points_to_interpolate).reshape(xi.shape)
+    interp = RegularGridInterpolator((x[:,0,0], y[0,:,0],z[0,0,:]), uu[3],bounds_error=False, fill_value=None,method='linear')
+    uu[3] = interp(points_to_interpolate).reshape(xi.shape)
+    interp = RegularGridInterpolator((x[:,0,0], y[0,:,0],z[0,0,:]), bu[0],bounds_error=False, fill_value=None,method='linear')
+    bu[0] = interp(points_to_interpolate).reshape(xi.shape)
+    interp = RegularGridInterpolator((x[:,0,0], y[0,:,0],z[0,0,:]), bu[1],bounds_error=False, fill_value=None,method='linear')
+    bu[1] = interp(points_to_interpolate).reshape(xi.shape)
+    interp = RegularGridInterpolator((x[:,0,0], y[0,:,0],z[0,0,:]), bu[2],bounds_error=False, fill_value=None,method='linear')
+    bu[2] = interp(points_to_interpolate).reshape(xi.shape)
+    interp = RegularGridInterpolator((x[:,0,0], y[0,:,0],z[0,0,:]), bu[3],bounds_error=False, fill_value=None,method='linear')
+    bu[3] = interp(points_to_interpolate).reshape(xi.shape)
+    interp = RegularGridInterpolator((x[:,0,0], y[0,:,0],z[0,0,:]), bsq,bounds_error=False, fill_value=None,method='linear')
+    bsq = interp(points_to_interpolate).reshape(xi.shape)
+    # new_index = scipy.interpolate.griddata((x.flatten(),y.flatten(),z.flatten()),index,(xi,yi,zi),method = "nearest",fill_value = 0)
+    
+    # x = new_x * 1.0
+    # y = new_y * 1.0
+    # z = new_z * 1.0
+    # rho = rho.flatten()[new_index]*1.0 
+    # press = press.flatten()[new_index] * 1.0
+    # vel1 = vel1.flatten()[new_index] * 1.0
+    # vel2 = vel2.flatten()[new_index] * 1.0
+    # vel3 = vel3.flatten()[new_index] * 1.0
+    # uu[0] = uu[0].flatten()[new_index] * 1.0
+    # uu[1] = uu[1].flatten()[new_index] * 1.0
+    # uu[2] = uu[2].flatten()[new_index] * 1.0
+    # uu[3] = uu[3].flatten()[new_index] * 1.0
+    # bu[0] = bu[0].flatten()[new_index] * 1.0
+    # bu[1] = bu[1].flatten()[new_index] * 1.0
+    # bu[2] = bu[2].flatten()[new_index] * 1.0
+    # bu[3] = bu[3].flatten()[new_index] * 1.0
+    # bsq = bsq.flatten()[new_index] * 1.0
+    uu_tmp = uu * 1.0
+    bu_tmp = bu * 1.0
+    uu[1] = uu_tmp[1] * x_hat_prime[0] + uu_tmp[2] * y_hat_prime[0]  + uu_tmp[3] * z_hat_prime[0]
+    uu[2] = uu_tmp[1] * x_hat_prime[1] + uu_tmp[2] * y_hat_prime[1]  + uu_tmp[3] * z_hat_prime[1]
+    uu[3] = uu_tmp[1] * x_hat_prime[2] + uu_tmp[2] * y_hat_prime[2]  + uu_tmp[3] * z_hat_prime[2]
+    bu[1] = bu_tmp[1] * x_hat_prime[0] + bu_tmp[2] * y_hat_prime[0]  + bu_tmp[3] * z_hat_prime[0]
+    bu[2] = bu_tmp[1] * x_hat_prime[1] + bu_tmp[2] * y_hat_prime[1]  + bu_tmp[3] * z_hat_prime[1]
+    bu[3] = bu_tmp[1] * x_hat_prime[2] + bu_tmp[2] * y_hat_prime[2]  + bu_tmp[3] * z_hat_prime[2]
+    Bcc1 = (bu[1] * uu[0] - bu[0] * uu[1])
+    Bcc2 = (bu[2] * uu[0] - bu[0] * uu[2])
+    Bcc3 = (bu[3] * uu[0] - bu[0] * uu[3])
+  x = 1.0*new_x 
+  y = 1.0*new_y 
+  z = 1.0*new_z
+
 def yt_extract_box_chris(i_dump,box_radius = 0.5,mhd=True,gr=False,a=0.0):
   global region,x,y,z,rho,press,vel1,vel2,vel3,Bcc1,Bcc2,Bcc3,bsq,vsq,uu,bsq,bu,bd
   global nx,ny,nz
@@ -1435,6 +1670,7 @@ def phibh():
   dx2 = np.diff(x2f)
   dOmega = (gdet * dx2[None,:,None]) * dx3[None,None,:]
   return 0.5*np.abs(Bcc1*dOmega).sum(-1).sum(-1)
+
 def r_to_ir(r_input):
   dlog10r = np.diff(np.log10(r[-1,:]))[0]
   r_min = r[-1,0]
@@ -3419,7 +3655,7 @@ def make_grmhd_restart_file(path_to_sim_data,path_to_vector_potential,idump_sim,
   nphi = 400
 
   # low_res = True
-  # nr = 32
+  # nr = 32https://aka.ms/dotnet/8.0/windowsdesktop-runtime-win-x64.exe
   # nth = 32
   # nphi = 32
   os.chdir(path_to_vector_potential)
@@ -3642,7 +3878,7 @@ def rd_yt_convert_to_spherical(idump,MHD=False,th=0,ph=0,omega_phi = None,dump_n
       xi = xi_prime * x_hat[0] + yi_prime * y_hat[0] + zi_prime * z_hat[0]
       yi = xi_prime * x_hat[1] + yi_prime * y_hat[1] + zi_prime * z_hat[1]
       zi = xi_prime * x_hat[2] + yi_prime * y_hat[2] + zi_prime * z_hat[2] 
-    new_index = scipy.interpolate.griddata((ds.r['x'],ds.r['y'],ds.r['z']),index,(xi,yi,zi),method = method,fill_value = fill_value)
+    new_index = scipy.interpolate.griddata((ds.r['x'],ds.r['y'],ds.r['z']),index,(xi,yi,zi),method = method,fill_value = fill_value).astype(np.int64)
 
 
     from yt.units import pc, msun,kyr
@@ -8629,7 +8865,7 @@ def ue_to_kappae(ue,rho,mue=2.0):
   return theta_e**(3.0/2.0) *  (theta_e + 2.0/5.0)**(3.0/2.0) / rhoe;
 
 def get_Te_Tg(kappa,rho,press,gr=False,mue=2.0,mu_tot = None):
-  global Te, Tg, Ti
+  global Te, Tg, Ti, mu_highT
   mp_over_kev = 9.994827
   mp_over_me = 1836.15267507
   set_constants()
@@ -13363,176 +13599,241 @@ def calc_error_bondi_boosted(i_dump,vbh=0.9,z0=-80):
 
   return np.array(err)
 
+def calc_area_contour_in_3D():
+  sigma = bsq/rho 
+  indices = np.where(np.isclose(sigma, 1.0,rtol=0.1))
+  x_contour = x[indices]                              
+  y_contour = y[indices]
+  z_contour = z[indices]
+  points = np.column_stack((x_contour, y_contour, z_contour))
+
+  tri = Delaunay(points)
+
+  def triangle_area(vertices):
+      # Ensure vertices is a 2D array
+      vertices = np.atleast_2d(vertices)
+      
+      # Calculate the area of a triangle in 3D space using its vertices
+      a, b, c = vertices[0], vertices[1], vertices[2]
+      return 0.5 * np.linalg.norm(np.cross(b - a, c - a))
+
+  triangle_areas = np.array([triangle_area(points[simplex]) for simplex in tri.simplices])
+  total_area = np.sum(triangle_areas)
+
+
+#####################################################################################################################################################
+#####################################################################################################################################################
+
+
+# Function to compute the slice of a 3D field along a plane defined by the direction (vx, vy) and the length L, using interpolation on the given field and its corresponding coordinates
 def slice(field, vx, vy, L):
-    v = np.array([vx, vy])
-    v = v / np.linalg.norm(v)
+  v = np.array([vx, vy])
+  v = v / np.linalg.norm(v)
 
-    n = 256
-    r_val = np.linspace(0, L, n)
-    z_val = np.linspace(-L/2, L/2, n)
-    r_grid, z_grid = np.meshgrid(r_val, z_val, indexing='ij')
+  n = 128
+  r_val = np.linspace(0, L, n)
+  z_val = np.linspace(-L/2, L/2, n)
+  r_grid, z_grid = np.meshgrid(r_val, z_val, indexing='ij')
 
-    x = r_grid * v[0]
-    y = r_grid * v[1]
-    z = z_grid
+  x = r_grid * v[0]
+  y = r_grid * v[1]
+  z = z_grid
 
-    def to_index(coord):
-        return (coord + L) * (n - 1) / (2 * L)
+  def to_index(coord):
+    return (coord + L) * (n - 1) / (2 * L)
 
-    x_idx = to_index(x)
-    y_idx = to_index(y)
-    z_idx = to_index(z)
+  x_idx = to_index(x)
+  y_idx = to_index(y)
+  z_idx = to_index(z)
 
-    coords = np.array([x_idx, y_idx, z_idx])
-    slice_data = map_coordinates(field, coords, order=1, mode='nearest')
+  coords = np.array([x_idx, y_idx, z_idx])
+  slice_data = map_coordinates(field, coords, order=1, mode='nearest')
 
-    return slice_data, coords, r_grid, z_grid
+  return slice_data, coords, r_grid, z_grid
 
+# Function to project the 3D fields Fx, Fy, Fz onto a 2D plane defined by the direction (vx, vy) and the coordinates of the slice, using interpolation on the given fields and their corresponding coordinates
 def project(Fx, Fy, Fz, coords, vx, vy):
-    v = np.array([vx, vy])
-    v = v / np.linalg.norm(v)
-    F_e1 = Fx * v[0] + Fy * v[1]
-    F1_slice = map_coordinates(F_e1, coords, order=1, mode='nearest')
-    F2_slice = map_coordinates(Fz, coords, order=1, mode='nearest')
-    return F1_slice, F2_slice
+  v = np.array([vx, vy])
+  v = v / np.linalg.norm(v)
+  F_e1 = Fx * v[0] + Fy * v[1]
+  F1_slice = map_coordinates(F_e1, coords, order=1, mode='nearest')
+  F2_slice = map_coordinates(Fz, coords, order=1, mode='nearest')
+  return F1_slice, F2_slice
 
+# Function to compute the profile of a field along a line defined by the direction (dx, dz) and length l, centered at (x0, z0), using interpolation on the given field and its corresponding x and z axes
 def profile(field, dx, dz, l, x0, z0, x_axis, z_axis):
-    if dz==0:
-        vx = 0
-        vz = 1
-    elif dx==0:
-        vx = 1
-        vz = 0
-    else:
-        vx = dz / np.sqrt(dx**2 + dz**2)
-        vz = - dx / np.sqrt(dx**2 + dz**2)
-    s = np.linspace(-l/2, l/2, 100)
-    x_l = x0 + s*vx
-    z_l = z0 + s*vz
-    points = np.stack([z_l, x_l], axis=-1)
-    interp = RegularGridInterpolator((z_axis, x_axis), field.T, bounds_error=False, fill_value=np.nan)
-    return interp(points), x_l, z_l, -(x_l-x0)*vx-(z_l-z0)*vz
+  if dz==0:
+    vx = 0
+    vz = 1
+  elif dx==0:
+    vx = 1
+    vz = 0
+  else:
+    vx = dz / np.sqrt(dx**2 + dz**2)
+    vz = - dx / np.sqrt(dx**2 + dz**2)
+  s = np.linspace(-l/2, l/2, 100)
+  x_l = x0 + s*vx
+  z_l = z0 + s*vz
+  points = np.stack([z_l, x_l], axis=-1)
+  interp = RegularGridInterpolator((z_axis, x_axis), field.T, bounds_error=False, fill_value=np.nan)
+  return interp(points), x_l, z_l, -(x_l-x0)*vx-(z_l-z0)*vz
 
+# Function to compute the slice of a 3D field along a cylindrical surface defined by the radius r0, the z-axis, and the length L, using interpolation on the given field and its corresponding coordinates  
+def polar(field, r0, z_axis, L):
+  n_th = np.round(512*np.pi*r0/15)
+  th_val = np.linspace(0,2*np.pi,int(n_th))
+  theta_grid, z_grid = np.meshgrid(th_val, z_axis, indexing='ij')
+  x = r0 * np.cos(theta_grid)
+  y = r0 * np.sin(theta_grid)
+  z = z_grid
+  def to_index(coord):
+      return (coord + L) * (128 - 1) / (2 * L)
+  x_idx = to_index(x)
+  y_idx = to_index(y)
+  z_idx = to_index(z)
+
+  coords = np.array([x_idx, y_idx, z_idx])
+  slice_data = map_coordinates(field, coords, order=1, mode='nearest')
+  return slice_data, coords, theta_grid, z_gri
+
+# Function to compute the numerical derivative of a field f with respect to the coordinate specified by n (0 for time, 1 for x, 2 for y, 3 for z), using numpy's gradient function
 def der(f,n,x,y,z):
-    if (n==0):
-        return 0
-    elif (n==1):
-        return np.gradient(f,x[:,0,0],axis=n-1, edge_order=2)
-    elif (n==2):
-        return np.gradient(f,y[0,:,0],axis=n-1, edge_order=2)
-    elif (n==3):
-        return np.gradient(f,z[0,0,:],axis=n-1, edge_order=2)
+  if (n==0):
+      return 0
+  elif (n==1):
+      return np.gradient(f,x[:,0,0],axis=n-1, edge_order=2)
+  elif (n==2):
+      return np.gradient(f,y[0,:,0],axis=n-1, edge_order=2)
+  elif (n==3):
+      return np.gradient(f,z[0,0,:],axis=n-1, edge_order=2)
 
+# Function to compute the Levi Civita symbol
 def symbol(i,j,k,l):
-    if ((i==j) or (i==k) or (l==i) or (k==j) or (l==j) or (l==k)):
-        return 0
-    else:
-        return (j - i) * (k - i) * (l - i) * (k - j) * (l - j) * (l - k) / (np.abs(j - i) * np.abs(k - i) * np.abs(l - i) * np.abs(k - j) * np.abs(l - j) * np.abs(l - k))
+  if ((i==j) or (i==k) or (l==i) or (k==j) or (l==j) or (l==k)):
+      return 0
+  else:
+      return (j - i) * (k - i) * (l - i) * (k - j) * (l - j) * (l - k) / (np.abs(j - i) * np.abs(k - i) * np.abs(l - i) * np.abs(k - j) * np.abs(l - j) * np.abs(l - k))
 
+# Function to compute the Faraday tensor F from the metric g, its inverse gu, the 4-velocity ud, and the magnetic field bd
 def F(g,ud,bd):
-    det_g = np.empty((128,128,128))
-    for i in range(128):
-        for j in range(128):
-            for k in range(128):
-                det_g[i,j,k] = np.linalg.det(g[:,:,i,j,k])
-    far = np.zeros(g.shape)
-    for i in range(4):
-        for j in range(4):
-            sum0 = 0
-            for k in range(4):
-                for l in range(4):
-                    temp = symbol(i,j,k,l) * ud[k,:,:,:] * bd[l,:,:,:]
-                    sum0 = temp + sum0
-            far[i,j,:,:,:] = -((-det_g[:,:,:])**(-0.5)) * sum0
-    return far
+  det_g = np.empty((128,128,128))
+  for i in range(128):
+      for j in range(128):
+          for k in range(128):
+              det_g[i,j,k] = np.linalg.det(g[:,:,i,j,k])
+  far = np.zeros(g.shape)
+  for i in range(4):
+      for j in range(4):
+          sum0 = 0
+          for k in range(4):
+              for l in range(4):
+                  temp = symbol(i,j,k,l) * ud[k,:,:,:] * bd[l,:,:,:]
+                  sum0 = temp + sum0
+          far[i,j,:,:,:] = -((-det_g[:,:,:])**(-0.5)) * sum0
+  return far
 
+# Function to compute the Christoffel symbols and the current density J from the metric g, its inverse gu, the Faraday tensor F, and its time derivative F_post
 def J(gd,gu,F,F_post,x,y,z):
-    chris = np.empty((4,4,4,128,128,128))
-    for i in range(4):
-        for j in range(4):
-            for k in range(4):
-                sum = 0
-                for l in range(4):
-                    temp = 0.5 * gu[i,l,:,:,:] * ( der(gd[l,k,:,:,:],j,x,y,z) + der(gd[j,l,:,:,:],k,x,y,z) + der(gd[j,k,:,:,:],l,x,y,z) )
-                    sum = sum + temp
-                chris[i,j,k,:,:,:] = sum
-    cur = np.empty((4,128,128,128))
-    for i in range(4):
-        sum0 = 0
-        for j in range(4):
-            sum1 = 0
-            for k in range(4):
-                temp = chris[j,j,k] * F[k,i,:,:,:] + chris[i,j,k] * F[j,k,:,:,:]
-                sum1 = sum1 + temp
-            if (j==0):
-                temp0 = (F_post[j,i,:,:,:] - F[j,i,:,:,:]) / 10
-            else:
-                temp0 = der(F[j,i,:,:,:],j,x,y,z)
-            sum0 = temp0 + sum1
-        cur[i,:,:,:] = sum0
-    return cur, np.sqrt(np.einsum('mxyz,nxyz,mnxyz->xyz', cur[1:,:,:,:], cur[1:,:,:,:], gd[1:,1:,:,:,:]))
+  chris = np.empty((4,4,4,128,128,128))
+  for i in range(4):
+      for j in range(4):
+          for k in range(4):
+              sum = 0
+              for l in range(4):
+                  temp = 0.5 * gu[i,l,:,:,:] * ( der(gd[l,k,:,:,:],j,x,y,z) + der(gd[j,l,:,:,:],k,x,y,z) + der(gd[j,k,:,:,:],l,x,y,z) )
+                  sum = sum + temp
+              chris[i,j,k,:,:,:] = sum
+  cur = np.empty((4,128,128,128))
+  for i in range(4):
+      sum0 = 0
+      for j in range(4):
+          sum1 = 0
+          for k in range(4):
+              temp = chris[j,j,k] * F[k,i,:,:,:] + chris[i,j,k] * F[j,k,:,:,:]
+              sum1 = sum1 + temp
+          if (j==0):
+              temp0 = (F_post[j,i,:,:,:] - F[j,i,:,:,:]) / 10
+          else:
+              temp0 = der(F[j,i,:,:,:],j,x,y,z)
+          sum0 = temp0 + sum1
+      cur[i,:,:,:] = sum0
+  return cur, np.sqrt(np.einsum('mxyz,nxyz,mnxyz->xyz', cur[1:,:,:,:], cur[1:,:,:,:], gd[1:,1:,:,:,:]))
 
-def cleanup(sigma, dbp, bb, rr, rplus):
-    dbp[rr < rplus] = dbp.min()
-    sigma[rr < rplus] = sigma.max()
-    bb[rr < rplus] = bb.max()
-    mask = (sigma < 1) & (dbp > 0.5) & (bb < np.percentile(bb,20))
-    labeled, num = label(mask)
-    for k in range(1, num + 1):
-        if rr[labeled == k].min() > 1.02*rplus:
-            mask[labeled == k] = 0
-    labeled2, num2 = label(mask)
-    sizes = np.bincount(labeled2.ravel())
-    if num2 > 0:
-        [s] =np.where(sizes == sizes[1:].max())
-        if len(s) > 1:
-            check = []
-            for i in range(len(s)):
-                check.append(rr[labeled == s[i]].max())
-            s = s[np.argmax(check)]
-            mask  = labeled2 == s
-        else:
-            mask  = labeled2 == s
-    return mask
+# Function to clean up the mask by removing regions that are likely to be noise, based on the sigma and da values, and the distance from the origin
+def cleanup(sigma, da, rr, rplus):
+  sigma[rr < rplus] = sigma.max()
+  da[rr < rplus] = da.min()
+  mask = (sigma < 2) & (np.log10(da) > -1)
+  labeled, num = label(mask)
+  for k in range(1, num + 1):
+      if rr[labeled == k].min() > 1.025*rplus:
+          mask[labeled == k] = 0
+  labeled2, num2 = label(mask)
+  sizes = np.bincount(labeled2.ravel())
+  if num2 > 0:
+      [s] =np.where(sizes == sizes[1:].max())
+      if len(s) > 1:
+          check = []
+          for i in range(len(s)):
+              check.append(rr[labeled == s[i]].max())
+          s = s[np.argmax(check)]
+          mask  = labeled2 == s
+      else:
+          mask  = labeled2 == s
+  return mask
 
-def sheet(mask, r_slice, z_slice):
-    skel_img = skeletonize(mask).astype(bool)
-    if np.count_nonzero(skel_img) < 2:
-        return np.array([]), np.array([]), np.array([])
-    skel = Skeleton(skel_img)
+# Function to compute the skeleton of a mask and find the best path from the point closest to the origin to a terminal node, minimizing the average sigma along the path
+def sheet(mask, sigma_slice, r_slice, z_slice):
+  skel_img = skeletonize(mask).astype(bool)
+  if np.count_nonzero(skel_img) < 2:
+      return np.array([]), np.array([]), np.array([])
+  skel = Skeleton(skel_img)
 
-    adj = skel.graph
-    G = netx.from_scipy_sparse_array(adj)
+  adj = skel.graph
+  G = netx.from_scipy_sparse_array(adj)
 
-    if G.number_of_nodes() == 0:
-        return np.array([]), np.array([]), np.array([])
+  if G.number_of_nodes() == 0:
+      return np.array([]), np.array([]), np.array([])
 
-    coords = np.array([skel.coordinates[n] for n in range(G.number_of_nodes())])
-    r_vals = r_slice[coords[:, 0].astype(int), coords[:, 1].astype(int)]
-    z_vals = z_slice[coords[:, 0].astype(int), coords[:, 1].astype(int)]
-    rr = np.sqrt(r_vals**2 + z_vals**2)
+  coords = np.array([skel.coordinates[n] for n in range(G.number_of_nodes())])
+  r_vals = r_slice[coords[:, 0].astype(int), coords[:, 1].astype(int)]
+  z_vals = z_slice[coords[:, 0].astype(int), coords[:, 1].astype(int)]
+  sigma_vals = sigma_slice[coords[:, 0].astype(int), coords[:, 1].astype(int)]
+  rr = np.sqrt(r_vals**2 + z_vals**2)
 
-    node_min_r = np.argmin(rr)
-    node_max_r = np.argmax(rr)
+  node_start = np.argmin(rr)
 
-    def edge_weight(u, v, d):
-        r1, z1 = r_vals[u], z_vals[u]
-        r2, z2 = r_vals[v], z_vals[v]
-        return np.sqrt((r1 - r2)**2 + (z1 - z2)**2)
+  def edge_weight(u, v, d):
+      return 0.5 * (sigma_vals[u] + sigma_vals[v])
 
-    try:
-        path_nodes = netx.shortest_path(G, node_min_r, node_max_r, weight=edge_weight)
-    except netx.NetworkXNoPath:
-        return np.array([]), np.array([]), np.array([])
+  degree_dict = dict(G.degree())
+  terminal_nodes = [n for n, deg in degree_dict.items() if deg == 1 and n != node_start]
+  if not terminal_nodes:
+      return np.array([]), np.array([]), np.array([])
 
-    path_r = r_vals[path_nodes]
-    path_z = z_vals[path_nodes]
+  best_path, best_avg_sigma = None, np.inf
 
-    diffs = np.sqrt(np.diff(path_r)**2 + np.diff(path_z)**2)
-    l = np.concatenate([[0], np.cumsum(diffs)])
+  for n_end in terminal_nodes:
+      try:
+          path_nodes = netx.shortest_path(G, node_start, n_end, weight=edge_weight)
+          avg_sigma = np.mean(sigma_vals[path_nodes])
+          if avg_sigma < best_avg_sigma:
+              best_avg_sigma = avg_sigma
+              best_path = path_nodes
+      except netx.NetworkXNoPath:
+          continue
 
-    return path_r, path_z, l
+  if best_path is None:
+      return np.array([]), np.array([]), np.array([]), branch_stats
 
+  path_r = r_vals[best_path]
+  path_z = z_vals[best_path]
+  diffs = np.sqrt(np.diff(path_r)**2 + np.diff(path_z)**2)
+  l = np.concatenate([[0], np.cumsum(diffs)])
+
+  return path_r, path_z, l
+
+# Function to compute tangent vectors along a curve defined by (x, y) with a smoothing parameter b
 def tangent(x, y, b):
   dx = np.zeros_like(x)
   dy = np.zeros_like(y)
@@ -13569,24 +13870,234 @@ def tangent(x, y, b):
       dx[-1-i] = np.sign(x[-i]-x[-1-i])*delx2/np.sqrt(delx2**2+dely2**2)
       dy[-1-i] = np.sign(y[-i]-y[-1-i])*dely2/np.sqrt(delx2**2+dely2**2)
   return dx,dy
+  
+# Function to delete the generated plot files in the specified directories
+def delete():
+  !rm -rf ./plots_mayank/perpendicular_*.png
+  !rm -rf ./plots_mayank/profiles_*.png
+  !rm -rf /home/mshenoy/perpendicular_*.png
+  !rm -rf /home/mshenoy/profiles_*.png
+  
 
-def calc_area_contour_in_3D():
-  sigma = bsq/rho 
-  indices = np.where(np.isclose(sigma, 1.0,rtol=0.1))
-  x_contour = x[indices]                              
-  y_contour = y[indices]
-  z_contour = z[indices]
-  points = np.column_stack((x_contour, y_contour, z_contour))
+def eruption_data():
+  data = {
+      'standard': {
+          'short': {}
+          },
+      'mad': {
+          'beta6_a0': {},
+          'beta6_a9': {}
+          },
+      'nonmad': {
+          'beta6_a0': {},
+          'beta6_a9': {},
+          'beta2_a9': {},
+          'beta2_a0': {}
+          }
+      }
+  global vars
+  vars = ['rflux', 'dt', 'jetmax', 'njetmax', 'phimax', 'del_t']
+  for state in data.keys():
+      for run in data[state].keys():
+          for var in vars:
+              data[state][run][var] = []
+  !cd /fs/lustre/scratch/mshenoy/sim_runs/grmhd_restart_beta_1e6_cooling_121_a0_electrons
+  rd_1d_avg()
+  ir2 = r_to_ir(2)
+  ir5 = r_to_ir(5)     
+  peaks60 = [85, 135, 266, 294, 523, 557, 810, 938, 1070, 1125, 1357, 1449, 1616, 2012, 2047, 2170, 2534, 2615, 2894, 2930, 3158, 3269, 3464, 3534, 3628, 3795, 4014, 4184, 4443, 4529, 4556, 4575, 4725, 4786, 4852, 4892, 4977, 5019, 5092, 5157, 5245, 5351, 5432, 5681, 5716, 5762, 5807, 5879, 5949, 6035, 6089]
+  troughs60 = [129, 151, 282, 315, 536, 572, 837, 964, 1081, 1142, 1370, 1469, 1641, 2033, 2060, 2193, 2551, 2624, 2902, 2937, 3169, 3279, 3474, 3549, 3646, 3808, 4035, 4194, 4455, 4536, 4568, 4589, 4747, 4830, 4875, 4902, 4983, 5052, 5107, 5170, 5287, 5378, 5469, 5692, 5722, 5777, 5827, 5888, 5968, 6076, 6108]
+  njet60 = 100*Edot[:,ir5]/np.abs(mdot[:,ir2])
+  for i in range(len(peaks60)):
+      state = 'nonmad'
+      if peaks60[i] >= 4720:
+          state = 'mad'
+      data[state]['beta6_a0']['rflux'].append((Phibh[:,ir2][peaks60[i]]-Phibh[:,ir2][troughs60[i]])/Phibh[:,ir2][peaks60[i]])
+      data[state]['beta6_a0']['dt'].append(t[troughs60[i]]-t[peaks60[i]])
+      data[state]['beta6_a0']['jetmax'].append(((rjet_max_p[peaks60[i]:troughs60[i]+1]+rjet_max_m[peaks60[i]:troughs60[i]+1])/2).max())
+      data[state]['beta6_a0']['njetmax'].append(njet60[peaks60[i]:troughs60[i]+1].max())
+      data[state]['beta6_a0']['phimax'].append(Phibh[:,ir2][peaks60[i]])
+      if i==0:
+          continue
+      else:
+          data[state]['beta6_a0']['del_t'].append(t[peaks60[i]]-t[troughs60[i-1]])
+  !cd /fs/lustre/scratch/mshenoy/sim_runs/grmhd_restart_beta_1e6_cooling_121_a9_electrons
+  rd_1d_avg()
+  ir2 = r_to_ir(2)
+  ir5 = r_to_ir(5)
+  peaks69 = [87, 121, 176, 214, 234, 299, 361, 381, 425, 633, 967, 1101, 1299, 1535, 1552, 1712, 1733, 1805, 1986, 2076, 2203, 2324, 2623, 2682, 2852, 2892, 3072, 3101, 3141, 3358, 3467, 3617, 3710, 3722, 3734, 3766, 3817, 3883, 3994, 4039, 4472, 4499, 4991, 5106, 5143, 5256, 5413, 5568, 5633, 5727, 5770, 5886, 5903, 5965, 6008, 6033, 6228, 6358]
+  troughs69 = [98, 131, 192, 224, 247, 309, 371, 406, 435, 642, 977, 1117, 1309, 1546, 1563, 1720, 1760, 1812, 2000, 2090, 2213, 2334, 2633, 2697, 2860, 2902, 3085, 3111, 3159, 3373, 3486, 3646, 3718, 3732, 3745, 3775, 3830, 3893, 4020, 4050, 4485, 4505, 4999, 5113, 5181, 5269, 5435, 5600, 5643, 5751, 5805, 5892, 5926, 5981, 6019, 6066, 6247, 6374]
+  njet69 = 100*Edot[:,ir5]/np.abs(mdot[:,ir2])
+  for i in range(len(peaks69)):
+      state = 'nonmad'
+      if peaks69[i] >= 4578:
+          state = 'mad'
+      data[state]['beta6_a9']['rflux'].append((Phibh[:,ir2][peaks69[i]]-Phibh[:,ir2][troughs69[i]])/Phibh[:,ir2][peaks69[i]])
+      data[state]['beta6_a9']['dt'].append(t[troughs69[i]]-t[peaks69[i]])
+      data[state]['beta6_a9']['jetmax'].append(((rjet_max_p[peaks69[i]:troughs69[i]+1]+rjet_max_m[peaks69[i]:troughs69[i]+1])/2).max())
+      data[state]['beta6_a9']['njetmax'].append(njet69[peaks69[i]:troughs69[i]+1].max())
+      data[state]['beta6_a9']['phimax'].append(Phibh[:,ir2][peaks69[i]])
+      if i==0:
+          continue
+      else:
+          data[state]['beta6_a9']['del_t'].append(t[peaks69[i]]-t[troughs69[i-1]])
+  !cd /fs/lustre/scratch/mshenoy/sim_runs/grmhd_restart_beta_1e2_cooling_121_a9_electrons
+  rd_1d_avg()
+  ir2 = r_to_ir(2)
+  ir5 = r_to_ir(5)
+  peaks29 = [127, 183, 281, 715, 971, 1104, 1195, 1289, 1324, 1490, 1614, 1631, 1698, 1771, 1838, 1972, 1998, 2060, 2102, 2178, 2820, 2856, 3031, 3085, 3103, 3380, 3596, 3674, 3787, 4268, 4402, 4467, 4915, 5018, 5738, 5762, 5798, 5886]
+  troughs29 = [137, 195, 295, 751, 998, 1145, 1213, 1307, 1350, 1508, 1623, 1651, 1709, 1799, 1855, 1983, 2009, 2098, 2119, 2196, 2841, 2869, 3055, 3100, 3118, 3413, 3615, 3702, 3804, 4291, 4439, 4489, 4947, 5063, 5749, 5780, 5811, 5901]
+  njet29 = 100*Edot[:,ir5]/np.abs(mdot[:,ir2])
+  for i in range(len(peaks29)):
+      data['nonmad']['beta2_a9']['rflux'].append((Phibh[:,ir2][peaks29[i]]-Phibh[:,ir2][troughs29[i]])/Phibh[:,ir2][peaks29[i]])
+      data['nonmad']['beta2_a9']['dt'].append(t[troughs29[i]]-t[peaks29[i]])
+      data['nonmad']['beta2_a9']['jetmax'].append(((rjet_max_p[peaks29[i]:troughs29[i]+1]+rjet_max_m[peaks29[i]:troughs29[i]+1])/2).max())
+      data['nonmad']['beta2_a9']['njetmax'].append(njet29[peaks29[i]:troughs29[i]+1].max())
+      data['nonmad']['beta2_a9']['phimax'].append(Phibh[:,ir2][peaks29[i]])
+      if i==0:
+          continue
+      else:
+          data['nonmad']['beta2_a9']['del_t'].append(t[peaks29[i]]-t[troughs29[i-1]])
+  !cd /fs/lustre/scratch/mshenoy/sim_runs/grmhd_restart_beta_1e2_cooling_121_a0_electrons
+  rd_1d_avg()
+  ir2 = r_to_ir(2)
+  ir5 = r_to_ir(5)
+  peaks20 = [178, 286, 728, 795, 922, 1359, 1423, 1527, 1704, 1757, 1985, 2090, 2362, 2721, 2872, 2937, 3056, 3094, 3231, 3416, 3605, 3732, 3908, 3963, 4062, 4123, 4316, 4542, 4647, 4690, 4740, 4777, 4859, 4914, 4951, 5178, 5276, 5380, 5405, 5442, 5497, 5545, 5588, 5611, 5745, 5944, 5964, 6426, 6643]
+  troughs20 = [215, 338, 744, 811, 967, 1371, 1455, 1558, 1752, 1788, 1993, 2125, 2418, 2761, 2920, 2984, 3067, 3124, 3259, 3429, 3623, 3765, 3952, 3987, 4072, 4132, 4344, 4561, 4662, 4724, 4763, 4804, 4890, 4929, 4964, 5210, 5296, 5389, 5420, 5481, 5509, 5576, 5607, 5654, 5780, 5956, 5990, 6441, 6676]
+  njet20 = 100*Edot[:,ir5]/np.abs(mdot[:,ir2])
+  for i in range(len(peaks20)):
+      data['nonmad']['beta2_a0']['rflux'].append((Phibh[:,ir2][peaks20[i]]-Phibh[:,ir2][troughs20[i]])/Phibh[:,ir2][peaks20[i]])
+      data['nonmad']['beta2_a0']['dt'].append(t[troughs20[i]]-t[peaks20[i]])
+      data['nonmad']['beta2_a0']['jetmax'].append(((rjet_max_p[peaks20[i]:troughs20[i]+1]+rjet_max_m[peaks20[i]:troughs20[i]+1])/2).max())
+      data['nonmad']['beta2_a0']['njetmax'].append(njet20[peaks20[i]:troughs20[i]+1].max())
+      data['nonmad']['beta2_a0']['phimax'].append(Phibh[:,ir2][peaks20[i]])
+      if i==0:
+          continue
+      else:
+          data['nonmad']['beta2_a0']['del_t'].append(t[peaks20[i]]-t[troughs20[i-1]])
+  !cd /fs/lustre/scratch/mshenoy/sim_runs/mad_case_a_0.9_128_ppm
+  rd_1d_avg()
+  ir2 = r_to_ir(2)
+  ir5 = r_to_ir(5)
+  peaksm = [212, 237, 255, 285, 290, 301, 317, 343, 353, 357, 375, 378, 384, 398, 405, 416, 438, 446, 451, 463, 466, 472, 479, 494]
+  troughsm = [220, 240, 268, 289, 299, 303, 318, 346, 356, 364, 377, 381, 395, 404, 408, 420, 441, 449, 453, 464, 467, 477, 484, 496]
+  njetm = 100*Edot[:,ir5]/np.abs(mdot[:,ir2])
+  for i in range(len(peaksm)):
+      data['standard']['short']['rflux'].append((Phibh[:,ir2][peaksm[i]]-Phibh[:,ir2][troughsm[i]])/Phibh[:,ir2][peaksm[i]])
+      data['standard']['short']['dt'].append(t[troughsm[i]]-t[peaksm[i]])
+      data['standard']['short']['jetmax'].append(((rjet_max_p[peaksm[i]:troughsm[i]+1]+rjet_max_m[peaksm[i]:troughsm[i]+1])/2).max())
+      data['standard']['short']['njetmax'].append(njetm[peaksm[i]:troughsm[i]+1].max())
+      data['standard']['short']['phimax'].append(Phibh[:,ir2][peaksm[i]])
+      if i==0:
+          continue
+      else:
+          data['standard']['short']['del_t'].append(t[peaksm[i]]-t[troughsm[i-1]])
+  return data
+    
 
-  tri = Delaunay(points)
+# Function to create histograms and scatter plots for the specified data, x and y variables, and state, with appropriate labels, bins, colors, and legends
+def hist(data, xdata, ydata, state):
+  labels = {
+      'rflux': 'Relative Flux Drop',
+      'dt': 'Eruption Duration (in M)',
+      'jetmax': 'Max Jet Radius (in $r_G$)',
+      'njetmax': 'Max Jet Efficiency (in %)',
+      'phimax': 'Peak Flux'
+  }
+  bins = {
+      'rflux': np.logspace(np.log10(0.02), np.log10(0.6), 21),
+      'dt': np.logspace(np.log10(15), np.log10(700), 21),
+      'jetmax': np.logspace(np.log10(2), np.log10(1500), 21),
+      'njetmax': np.logspace(-1, np.log10(1200), 21),
+      'phimax': np.logspace(np.log10(40), np.log10(300), 21),
+  }
+  name = {
+      'beta6_a0': r'$\beta=10^6,a=0$',
+      'beta6_a9': r'$\beta=10^6,a=0.9375$',
+      'beta2_a9': r'$\beta=10^2,a=0.9375$',
+      'beta2_a0': r'$\beta=10^2,a=0$',
+      'a9': 'a=0.9375',
+      'mad': 'Windfed MAD',
+      'nonmad': 'Windfed Non-MAD',
+      'standard': 'Standard MAD'
+  }
+  title = {
+      'mad': 'Windfed MAD Flux Eruptions',
+      'nonmad': 'Windfed Non-MAD Flux Eruptions',
+      'standard': 'Standard MAD Flux Eruptions',
+      'all': 'Windfed vs Standard Flux Eruptions',
+      'detail': 'Windfed vs Standard Flux Eruptions'
+  }
+  mark = {
+      'beta6_a0': '.',
+      'beta6_a9': '*',
+      'beta2_a9': '*',
+      'beta2_a0': '.',
+      'a9': '*',
+  }
+  color = {
+      'mad': '#0072B2',
+      'nonmad': '#E69F00',
+      'standard': '#009E73'
+  }
+  clf()
+  fig, ax = plt.subplots(2,2, dpi=200, figsize=(6,5), gridspec_kw=dict(height_ratios=[1,3], width_ratios=[3,1]))
+  ax[0,1].axis('off')
+  if state in ['standard','mad','nonmad']:
+      for run in data[state].keys():
+          ax[1,0].scatter(data[state][run][xdata], data[state][run][ydata], label=name[run])
+          ax[0,0].hist(data[state][run][xdata], bins=bins[xdata], alpha=0.4)
+          ax[1,1].hist(data[state][run][ydata], bins=bins[ydata], orientation='horizontal', alpha=0.4)
+  elif state=='all':
+      for stat in data.keys():
+          dataset_x = []
+          dataset_y = []
+          for run in data[stat].keys():
+              dataset_x.extend(data[stat][run][xdata])
+              dataset_y.extend(data[stat][run][ydata])
+          ax[1,0].scatter(dataset_x, dataset_y, label=name[stat])
+          ax[0,0].hist(dataset_x, bins=bins[xdata], alpha=0.4)
+          ax[1,1].hist(dataset_y, bins=bins[ydata], orientation='horizontal', alpha=0.4)
+  else:
+      for stat in data.keys():
+          dataset_x = []
+          dataset_y = []
+          for run in data[stat].keys():
+              dataset_x.extend(data[stat][run][xdata])
+              dataset_y.extend(data[stat][run][ydata])
+              ax[1,0].scatter(data[stat][run][xdata], data[stat][run][ydata], color=color[stat], marker=mark[run])
+          ax[0,0].hist(dataset_x, bins=bins[xdata], alpha=0.4, color=color[stat])
+          ax[1,1].hist(dataset_y, bins=bins[ydata], orientation='horizontal', alpha=0.4, color=color[stat])
+      spin_handles = [Line2D([0], [0], marker='.', linestyle='', color='black', label=r'$a=0$'),
+                      Line2D([0], [0], marker='*', linestyle='', color='black', label=r'$a=0.9375$')]
+      state_handles = [Line2D([0], [0], marker='s', linestyle='', markerfacecolor=c, markeredgecolor=c, label=name[key]) for key, c in color.items()]
+      handle = spin_handles + state_handles
+      ax[0,1].legend(handles=handle, loc='center', fontsize=8, frameon=False, ncol=1)
+  if xdata == 'phimax':
+      k = 0.044
+      a = 0.9375
+      rplus = 1.+ np.sqrt(1.-a**2)
+      omega = a/(2*rplus)
+      f = 1 + 1.38 * (omega)**2 - 9.2 * (omega)**4
+      BZ = k * omega**2 * (bins[xdata]/2)**2 * f
+      ax[1,0].plot(bins[xdata], BZ, color='black', ls=':', alpha=0.5, label=r'$P_\text{BZ}$ ($a=0.9375$)')
+      ax[1,0].legend(frameon=False)
+  ax[1,0].set_xlabel(labels[xdata])
+  ax[1,0].set_ylabel(labels[ydata])
+  ax[1,0].set_xlim(bins[xdata][0], bins[xdata][-1])
+  ax[1,0].set_ylim(bins[ydata][0], bins[ydata][-1])
+  ax[0,0].set_xlim(bins[xdata][0], bins[xdata][-1])
+  ax[1,1].set_ylim(bins[ydata][0], bins[ydata][-1])
+  ax[1,0].set_xscale('log')
+  ax[0,0].set_xscale('log')
+  ax[1,0].set_yscale('log')
+  ax[1,1].set_yscale('log')
+  for a in ax.flat:
+      a.tick_params(which='both', direction='in', top=True, right=True)
+  ax[0,0].tick_params(axis='x', which='both', labelbottom=False)
+  ax[1,1].tick_params(axis='y', which='both', labelleft=False)
+  plt.tight_layout()
+  fig.suptitle(title[state])
+  fig.subplots_adjust(wspace=0.05, hspace=0.05, right=0.975, top=0.925)
+  plt.savefig('/fs/lustre/scratch/mshenoy/distribution_plots/test_%s_%s_%s.png'%(state, xdata, ydata))
 
-  def triangle_area(vertices):
-      # Ensure vertices is a 2D array
-      vertices = np.atleast_2d(vertices)
-      
-      # Calculate the area of a triangle in 3D space using its vertices
-      a, b, c = vertices[0], vertices[1], vertices[2]
-      return 0.5 * np.linalg.norm(np.cross(b - a, c - a))
-
-  triangle_areas = np.array([triangle_area(points[simplex]) for simplex in tri.simplices])
-  total_area = np.sum(triangle_areas)
