@@ -13875,7 +13875,7 @@ def tangent(x, y, b):
 def eruption_data():
     data = {
         'standard': {
-            'short': {}
+            'a9': {}
             },
         'mad': {
             'beta6_a0': {},
@@ -13981,15 +13981,15 @@ def eruption_data():
     troughsm = [220, 240, 268, 289, 299, 303, 318, 346, 356, 364, 377, 381, 395, 404, 408, 420, 441, 449, 453, 464, 467, 477, 484, 496]
     njetm = 100*Edot[:,ir5]/np.abs(mdot[:,ir2])
     for i in range(len(peaksm)):
-        data['standard']['short']['rflux'].append((Phibh[:,ir2][peaksm[i]]-Phibh[:,ir2][troughsm[i]])/Phibh[:,ir2][peaksm[i]])
-        data['standard']['short']['dt'].append(t[troughsm[i]]-t[peaksm[i]])
-        data['standard']['short']['jetmax'].append(((rjet_max_p[peaksm[i]:troughsm[i]+1]+rjet_max_m[peaksm[i]:troughsm[i]+1])/2).max())
-        data['standard']['short']['njetmax'].append(njetm[peaksm[i]:troughsm[i]+1].max())
-        data['standard']['short']['phimax'].append(Phibh[:,ir2][peaksm[i]])
+        data['standard']['a9']['rflux'].append((Phibh[:,ir2][peaksm[i]]-Phibh[:,ir2][troughsm[i]])/Phibh[:,ir2][peaksm[i]])
+        data['standard']['a9']['dt'].append(t[troughsm[i]]-t[peaksm[i]])
+        data['standard']['a9']['jetmax'].append(((rjet_max_p[peaksm[i]:troughsm[i]+1]+rjet_max_m[peaksm[i]:troughsm[i]+1])/2).max())
+        data['standard']['a9']['njetmax'].append(njetm[peaksm[i]:troughsm[i]+1].max())
+        data['standard']['a9']['phimax'].append(Phibh[:,ir2][peaksm[i]])
         if i==0:
             continue
         else:
-            data['standard']['short']['del_t'].append(t[peaksm[i]]-t[troughsm[i-1]])
+            data['standard']['a9']['del_t'].append(t[peaksm[i]]-t[troughsm[i-1]])
     return data   
 
 # Function to create histograms and scatter plots for the specified data, x and y variables, and state, with appropriate labels, bins, colors, and legends
