@@ -255,6 +255,244 @@ def polar(field, r0, z_axis, L):
     slice_data = map_coordinates(field, coords, order=1, mode='nearest')
     return slice_data, coords, theta_grid, z_grid
 
+def eruption_data():
+    data = {
+        'standard': {
+            'short': {}
+            },
+        'mad': {
+            'beta6_a0': {},
+            'beta6_a9': {}
+            },
+        'nonmad': {
+            'beta6_a0': {},
+            'beta6_a9': {},
+            'beta2_a9': {},
+            'beta2_a0': {}
+            }
+        }
+    global vars
+    vars = ['rflux', 'dt', 'jetmax', 'njetmax', 'phimax', 'del_t']
+    for state in data.keys():
+        for run in data[state].keys():
+            for var in vars:
+                data[state][run][var] = []
+    os.chdir("/fs/lustre/scratch/mshenoy/sim_runs/grmhd_restart_beta_1e6_cooling_121_a0_electrons")
+    rd_1d_avg()
+    ir2 = r_to_ir(2)
+    ir5 = r_to_ir(5)   
+    global peaks60, troughs60  
+    peaks60 = [85, 135, 266, 294, 523, 557, 810, 938, 1070, 1125, 1357, 1449, 1616, 2012, 2047, 2170, 2534, 2615, 2894, 2930, 3158, 3269, 3464, 3534, 3628, 3795, 4014, 4184, 4443, 4529, 4556, 4575, 4725, 4786, 4852, 4892, 4977, 5019, 5092, 5157, 5245, 5351, 5432, 5681, 5716, 5762, 5807, 5879, 5949, 6035, 6089]
+    troughs60 = [129, 151, 282, 315, 536, 572, 837, 964, 1081, 1142, 1370, 1469, 1641, 2033, 2060, 2193, 2551, 2624, 2902, 2937, 3169, 3279, 3474, 3549, 3646, 3808, 4035, 4194, 4455, 4536, 4568, 4589, 4747, 4830, 4875, 4902, 4983, 5052, 5107, 5170, 5287, 5378, 5469, 5692, 5722, 5777, 5827, 5888, 5968, 6076, 6108]
+    njet60 = 100*Edot[:,ir5]/np.abs(mdot[:,ir2])
+    for i in range(len(peaks60)):
+        state = 'nonmad'
+        if peaks60[i] >= 4720:
+            state = 'mad'
+        data[state]['beta6_a0']['rflux'].append((Phibh[:,ir2][peaks60[i]]-Phibh[:,ir2][troughs60[i]])/Phibh[:,ir2][peaks60[i]])
+        data[state]['beta6_a0']['dt'].append(t[troughs60[i]]-t[peaks60[i]])
+        data[state]['beta6_a0']['jetmax'].append(((rjet_max_p[peaks60[i]:troughs60[i]+1]+rjet_max_m[peaks60[i]:troughs60[i]+1])/2).max())
+        data[state]['beta6_a0']['njetmax'].append(njet60[peaks60[i]:troughs60[i]+1].max())
+        data[state]['beta6_a0']['phimax'].append(Phibh[:,ir2][peaks60[i]])
+        if i==0:
+            continue
+        else:
+            data[state]['beta6_a0']['del_t'].append(t[peaks60[i]]-t[troughs60[i-1]])
+    os.chdir("/fs/lustre/scratch/mshenoy/sim_runs/grmhd_restart_beta_1e6_cooling_121_a9_electrons")
+    rd_1d_avg()
+    ir2 = r_to_ir(2)
+    ir5 = r_to_ir(5)
+    global peaks69, troughs69
+    peaks69 = [87, 121, 176, 214, 234, 299, 361, 381, 425, 633, 967, 1101, 1299, 1535, 1552, 1712, 1733, 1805, 1986, 2076, 2203, 2324, 2623, 2682, 2852, 2892, 3072, 3101, 3141, 3358, 3467, 3617, 3710, 3722, 3734, 3766, 3817, 3883, 3994, 4039, 4472, 4499, 4991, 5106, 5143, 5256, 5413, 5568, 5633, 5727, 5770, 5886, 5903, 5965, 6008, 6033, 6228, 6358]
+    troughs69 = [98, 131, 192, 224, 247, 309, 371, 406, 435, 642, 977, 1117, 1309, 1546, 1563, 1720, 1760, 1812, 2000, 2090, 2213, 2334, 2633, 2697, 2860, 2902, 3085, 3111, 3159, 3373, 3486, 3646, 3718, 3732, 3745, 3775, 3830, 3893, 4020, 4050, 4485, 4505, 4999, 5113, 5181, 5269, 5435, 5600, 5643, 5751, 5805, 5892, 5926, 5981, 6019, 6066, 6247, 6374]
+    njet69 = 100*Edot[:,ir5]/np.abs(mdot[:,ir2])
+    for i in range(len(peaks69)):
+        state = 'nonmad'
+        if peaks69[i] >= 4578:
+            state = 'mad'
+        data[state]['beta6_a9']['rflux'].append((Phibh[:,ir2][peaks69[i]]-Phibh[:,ir2][troughs69[i]])/Phibh[:,ir2][peaks69[i]])
+        data[state]['beta6_a9']['dt'].append(t[troughs69[i]]-t[peaks69[i]])
+        data[state]['beta6_a9']['jetmax'].append(((rjet_max_p[peaks69[i]:troughs69[i]+1]+rjet_max_m[peaks69[i]:troughs69[i]+1])/2).max())
+        data[state]['beta6_a9']['njetmax'].append(njet69[peaks69[i]:troughs69[i]+1].max())
+        data[state]['beta6_a9']['phimax'].append(Phibh[:,ir2][peaks69[i]])
+        if i==0:
+            continue
+        else:
+            data[state]['beta6_a9']['del_t'].append(t[peaks69[i]]-t[troughs69[i-1]])
+    os.chdir("/fs/lustre/scratch/mshenoy/sim_runs/grmhd_restart_beta_1e2_cooling_121_a9_electrons")
+    rd_1d_avg()
+    ir2 = r_to_ir(2)
+    ir5 = r_to_ir(5)
+    global peaks29, troughs29
+    peaks29 = [127, 183, 281, 715, 971, 1104, 1195, 1289, 1324, 1490, 1614, 1631, 1698, 1771, 1838, 1972, 1998, 2060, 2102, 2178, 2820, 2856, 3031, 3085, 3103, 3380, 3596, 3674, 3787, 4268, 4402, 4467, 4915, 5018, 5738, 5762, 5798, 5886]
+    troughs29 = [137, 195, 295, 751, 998, 1145, 1213, 1307, 1350, 1508, 1623, 1651, 1709, 1799, 1855, 1983, 2009, 2098, 2119, 2196, 2841, 2869, 3055, 3100, 3118, 3413, 3615, 3702, 3804, 4291, 4439, 4489, 4947, 5063, 5749, 5780, 5811, 5901]
+    njet29 = 100*Edot[:,ir5]/np.abs(mdot[:,ir2])
+    for i in range(len(peaks29)):
+        data['nonmad']['beta2_a9']['rflux'].append((Phibh[:,ir2][peaks29[i]]-Phibh[:,ir2][troughs29[i]])/Phibh[:,ir2][peaks29[i]])
+        data['nonmad']['beta2_a9']['dt'].append(t[troughs29[i]]-t[peaks29[i]])
+        data['nonmad']['beta2_a9']['jetmax'].append(((rjet_max_p[peaks29[i]:troughs29[i]+1]+rjet_max_m[peaks29[i]:troughs29[i]+1])/2).max())
+        data['nonmad']['beta2_a9']['njetmax'].append(njet29[peaks29[i]:troughs29[i]+1].max())
+        data['nonmad']['beta2_a9']['phimax'].append(Phibh[:,ir2][peaks29[i]])
+        if i==0:
+            continue
+        else:
+            data['nonmad']['beta2_a9']['del_t'].append(t[peaks29[i]]-t[troughs29[i-1]])
+    os.chdir("/fs/lustre/scratch/mshenoy/sim_runs/grmhd_restart_beta_1e2_cooling_121_a0_electrons")
+    rd_1d_avg()
+    ir2 = r_to_ir(2)
+    ir5 = r_to_ir(5)
+    global peaks20, troughs20
+    peaks20 = [178, 286, 728, 795, 922, 1359, 1423, 1527, 1704, 1757, 1985, 2090, 2362, 2721, 2872, 2937, 3056, 3094, 3231, 3416, 3605, 3732, 3908, 3963, 4062, 4123, 4316, 4542, 4647, 4690, 4740, 4777, 4859, 4914, 4951, 5178, 5276, 5380, 5405, 5442, 5497, 5545, 5588, 5611, 5745, 5944, 5964, 6426, 6643]
+    troughs20 = [215, 338, 744, 811, 967, 1371, 1455, 1558, 1752, 1788, 1993, 2125, 2418, 2761, 2920, 2984, 3067, 3124, 3259, 3429, 3623, 3765, 3952, 3987, 4072, 4132, 4344, 4561, 4662, 4724, 4763, 4804, 4890, 4929, 4964, 5210, 5296, 5389, 5420, 5481, 5509, 5576, 5607, 5654, 5780, 5956, 5990, 6441, 6676]
+    njet20 = 100*Edot[:,ir5]/np.abs(mdot[:,ir2])
+    for i in range(len(peaks20)):
+        data['nonmad']['beta2_a0']['rflux'].append((Phibh[:,ir2][peaks20[i]]-Phibh[:,ir2][troughs20[i]])/Phibh[:,ir2][peaks20[i]])
+        data['nonmad']['beta2_a0']['dt'].append(t[troughs20[i]]-t[peaks20[i]])
+        data['nonmad']['beta2_a0']['jetmax'].append(((rjet_max_p[peaks20[i]:troughs20[i]+1]+rjet_max_m[peaks20[i]:troughs20[i]+1])/2).max())
+        data['nonmad']['beta2_a0']['njetmax'].append(njet20[peaks20[i]:troughs20[i]+1].max())
+        data['nonmad']['beta2_a0']['phimax'].append(Phibh[:,ir2][peaks20[i]])
+        if i==0:
+            continue
+        else:
+            data['nonmad']['beta2_a0']['del_t'].append(t[peaks20[i]]-t[troughs20[i-1]])
+    os.chdir("/fs/lustre/scratch/mshenoy/sim_runs/mad_case_a_0.9_128_ppm")
+    rd_1d_avg()
+    ir2 = r_to_ir(2)
+    ir5 = r_to_ir(5)
+    global peaksm, troughsm
+    peaksm = [212, 237, 255, 285, 290, 301, 317, 343, 353, 357, 375, 378, 384, 398, 405, 416, 438, 446, 451, 463, 466, 472, 479, 494]
+    troughsm = [220, 240, 268, 289, 299, 303, 318, 346, 356, 364, 377, 381, 395, 404, 408, 420, 441, 449, 453, 464, 467, 477, 484, 496]
+    njetm = 100*Edot[:,ir5]/np.abs(mdot[:,ir2])
+    for i in range(len(peaksm)):
+        data['standard']['short']['rflux'].append((Phibh[:,ir2][peaksm[i]]-Phibh[:,ir2][troughsm[i]])/Phibh[:,ir2][peaksm[i]])
+        data['standard']['short']['dt'].append(t[troughsm[i]]-t[peaksm[i]])
+        data['standard']['short']['jetmax'].append(((rjet_max_p[peaksm[i]:troughsm[i]+1]+rjet_max_m[peaksm[i]:troughsm[i]+1])/2).max())
+        data['standard']['short']['njetmax'].append(njetm[peaksm[i]:troughsm[i]+1].max())
+        data['standard']['short']['phimax'].append(Phibh[:,ir2][peaksm[i]])
+        if i==0:
+            continue
+        else:
+            data['standard']['short']['del_t'].append(t[peaksm[i]]-t[troughsm[i-1]])
+    return data
+
+def hist(data, xdata, ydata, state):
+  labels = {
+      'rflux': 'Relative Flux Drop',
+      'dt': 'Eruption Duration (in M)',
+      'jetmax': 'Max Jet Radius (in $r_G$)',
+      'njetmax': 'Max Jet Efficiency (in %)',
+      'phimax': 'Peak Flux'
+  }
+  bins = {
+      'rflux': np.logspace(np.log10(0.02), np.log10(0.6), 21),
+      'dt': np.linspace(0, 599, 21),
+      'jetmax': np.logspace(np.log10(2), np.log10(1500), 21),
+      'njetmax': np.logspace(-1, np.log10(1200), 21),
+      'phimax': np.logspace(np.log10(40), np.log10(300), 21),
+  }
+  name = {
+      'beta6_a0': r'$\beta=10^6,a=0$',
+      'beta6_a9': r'$\beta=10^6,a=0.9375$',
+      'beta2_a9': r'$\beta=10^2,a=0.9375$',
+      'beta2_a0': r'$\beta=10^2,a=0$',
+      'a9': 'a=0.9375',
+      'mad': 'Windfed MAD',
+      'nonmad': 'Windfed Non-MAD',
+      'standard': 'Standard MAD'
+  }
+  title = {
+      'mad': 'Windfed MAD Flux Eruptions',
+      'nonmad': 'Windfed Non-MAD Flux Eruptions',
+      'standard': 'Standard MAD Flux Eruptions',
+      'all': 'Windfed vs Standard Flux Eruptions',
+      'detail': 'Windfed vs Standard Flux Eruptions'
+  }
+  mark = {
+      'beta6_a0': '.',
+      'beta6_a9': '*',
+      'beta2_a9': '*',
+      'beta2_a0': '.',
+      'a9': '*',
+  }
+  color = {
+      'mad': '#0072B2',
+      'nonmad': '#E69F00',
+      'standard': '#009E73'
+  }
+  clf()
+  fig, ax = plt.subplots(2,2, dpi=200, figsize=(6,5), gridspec_kw=dict(height_ratios=[1,3], width_ratios=[3,1]))
+  ax[0,1].axis('off')
+  if state in ['standard','mad','nonmad']:
+      for run in data[state].keys():
+          ax[1,0].scatter(data[state][run][xdata], data[state][run][ydata], label=name[run])
+          ax[0,0].hist(data[state][run][xdata], bins=bins[xdata], alpha=0.4)
+          ax[1,1].hist(data[state][run][ydata], bins=bins[ydata], orientation='horizontal', alpha=0.4)
+  elif state=='all':
+      for stat in data.keys():
+          dataset_x = []
+          dataset_y = []
+          for run in data[stat].keys():
+              dataset_x.extend(data[stat][run][xdata])
+              dataset_y.extend(data[stat][run][ydata])
+          ax[1,0].scatter(dataset_x, dataset_y, label=name[stat])
+          ax[0,0].hist(dataset_x, bins=bins[xdata], alpha=0.4)
+          ax[1,1].hist(dataset_y, bins=bins[ydata], orientation='horizontal', alpha=0.4)
+  else:
+      for stat in data.keys():
+          dataset_x = []
+          dataset_y = []
+          for run in data[stat].keys():
+              dataset_x.extend(data[stat][run][xdata])
+              dataset_y.extend(data[stat][run][ydata])
+              ax[1,0].scatter(data[stat][run][xdata], data[stat][run][ydata], color=color[stat], marker=mark[run])
+          ax[0,0].hist(dataset_x, bins=bins[xdata], alpha=0.4, color=color[stat])
+          ax[1,1].hist(dataset_y, bins=bins[ydata], orientation='horizontal', alpha=0.4, color=color[stat])
+      spin_handles = [Line2D([0], [0], marker='.', linestyle='', color='black', label=r'$a=0$'),
+                      Line2D([0], [0], marker='*', linestyle='', color='black', label=r'$a=0.9375$')]
+      state_handles = [Line2D([0], [0], marker='s', linestyle='', markerfacecolor=c, markeredgecolor=c, label=name[key]) for key, c in color.items()]
+      handle = spin_handles + state_handles
+      ax[0,1].legend(handles=handle, loc='center', fontsize=8, frameon=False, ncol=1)
+  ax[1,0].set_xscale('log')
+  ax[0,0].set_xscale('log')
+  ax[1,0].set_yscale('log')
+  ax[1,1].set_yscale('log')
+  if xdata == 'phimax':
+    k = 0.044
+    a = 0.9375
+    rplus = 1.+ np.sqrt(1.-a**2)
+    omega = a/(2*rplus)
+    f = 1 + 1.38 * (omega)**2 - 9.2 * (omega)**4
+    BZ = k * omega**2 * (bins[xdata]/2)**2 * f
+    ax[1,0].plot(bins[xdata], BZ, color='black', ls=':', alpha=0.5, label=r'$P_\text{BZ}$ ($a=0.9375$)')
+    ax[1,0].legend(frameon=False)
+  elif xdata == 'dt':
+    ax[1,0].set_xscale('linear')
+    ax[0,0].set_xscale('linear')
+    dataset_x = []
+    dataset_y = []
+    for stat in data.keys():
+      for run in data[stat].keys():
+        dataset_x.extend(data[stat][run][xdata])
+        dataset_y.extend(data[stat][run][ydata])
+    def model(x, m, b):
+      return m * x + b
+    opt, cov = curve_fit(model, dataset_x, np.log10(dataset_y))
+    ax[1,0].plot(bins[xdata], 10**opt[1] * 10**(bins[xdata]*opt[0]), color='white', ls=':', alpha=0.5, label=r'$|(\Delta\Phi)_{rel}| \propto e^{t/%0.2f}$'%(np.log(np.e)/opt[0]))
+    ax[1,0].legend(frameon=False)
+  ax[1,0].set_xlabel(labels[xdata])
+  ax[1,0].set_ylabel(labels[ydata])
+  ax[1,0].set_xlim(bins[xdata][0], bins[xdata][-1])
+  ax[1,0].set_ylim(bins[ydata][0], bins[ydata][-1])
+  ax[0,0].set_xlim(bins[xdata][0], bins[xdata][-1])
+  ax[1,1].set_ylim(bins[ydata][0], bins[ydata][-1])
+  for a in ax.flat:
+      a.tick_params(which='both', direction='in', top=True, right=True)
+  ax[0,0].tick_params(axis='x', which='both', labelbottom=False)
+  ax[1,1].tick_params(axis='y', which='both', labelleft=False)
+  plt.tight_layout()
+  fig.suptitle(title[state])
+  fig.subplots_adjust(wspace=0.05, hspace=0.05, right=0.975, top=0.925)
+  plt.savefig('/fs/lustre/scratch/mshenoy/distribution_plots/test_%s_%s_%s.png'%(state, xdata, ydata), dpi=400)
 
 #START
 %run -i ./athena_script.py
