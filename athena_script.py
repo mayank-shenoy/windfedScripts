@@ -14095,7 +14095,7 @@ def hist(data, xdata, ydata, state):
     def model(x, m, b):
       return m * x + b
     opt, cov = curve_fit(model, dataset_x, np.log10(dataset_y))
-    ax[1,0].plot(bins[xdata], 10**opt[1] * 10**(bins[xdata]*opt[0]), color='white', ls=':', alpha=0.5, label=r'$|(\Delta\Phi)_{rel}| \propto e^{t/%0.2f}$'%(np.log(np.e)/opt[0]))
+    ax[1,0].plot(bins[xdata], 10**opt[1] * 10**(bins[xdata]*opt[0]), color='black', ls=':', alpha=0.5, label=r'$|(\Delta\Phi)_{rel}| \propto e^{t/%0.2f}$'%(np.log(np.e)/opt[0]))
     ax[1,0].legend(frameon=False)
   ax[1,0].set_xlabel(labels[xdata])
   ax[1,0].set_ylabel(labels[ydata])
