@@ -391,11 +391,11 @@ def hist(data, xdata, ydata, state):
       'phimax': np.logspace(np.log10(40), np.log10(300), 21),
   }
   name = {
-      'beta6_a0': r'$\beta=10^6,a=0$',
-      'beta6_a9': r'$\beta=10^6,a=0.9375$',
-      'beta2_a9': r'$\beta=10^2,a=0.9375$',
-      'beta2_a0': r'$\beta=10^2,a=0$',
-      'a9': 'a=0.9375',
+      'beta6_a0': r'$a=0$',
+      'beta6_a9': r'$a=0.9375$',
+      'beta2_a9': r'$a=0.9375$',
+      'beta2_a0': r'$a=0$',
+      'a9': r'$a=0.9375$',
       'mad': 'Windfed MAD',
       'nonmad': 'Windfed Non-MAD',
       'standard': 'Standard MAD'
@@ -424,7 +424,7 @@ def hist(data, xdata, ydata, state):
   ax[0,1].axis('off')
   if state in ['standard','mad','nonmad']:
       for run in data[state].keys():
-          ax[1,0].scatter(data[state][run][xdata], data[state][run][ydata], label=name[run])
+          ax[1,0].scatter(data[state][run][xdata], data[state][run][ydata], label=name[run], )
           ax[0,0].hist(data[state][run][xdata], bins=bins[xdata], alpha=0.4)
           ax[1,1].hist(data[state][run][ydata], bins=bins[ydata], orientation='horizontal', alpha=0.4)
   elif state=='all':
@@ -981,14 +981,43 @@ for i in range(2):
 fig.suptitle('MAD Flux Eruption Intervals')
 plt.savefig('plots_mayank/test.png')
 
+
+from scipy.stats import gaussian_kde
+from scipy.optimize import curve_fit
+
 mad_delt = []
-nonmad_delt = []
+mad_dt = []
 for run in data['mad'].keys():
     mad_delt.extend(data['mad'][run]['del_t'])
-for run in data['nonmad'].keys():
-    nonmad_delt.extend(data['nonmad'][run]['del_t'])
-    
-fig, ax = plt.subplots(2, figsize=(7,5), tight_layout=True, sharex=True)
+    mad_dt.extend(data['mad'][run]['dt'])
+
+kde9t = gaussian_kde(data['mad']['beta6_a9']['dt'])
+kde0t = gaussian_kde(data['mad']['beta6_a0']['dt'])
+kde0T = gaussian_kde(data['mad']['beta6_a0']['del_t'])
+kde9T = gaussian_kde(data['mad']['beta6_a9']['del_t'])
+bins_t = np.linspace(min(mad_dt), max(mad_dt), 100)
+bins_T = np.linspace(min(mad_delt), max(mad_delt), 100)
+
+fig, ax = plt.subplots(2, figsize=(7,5), tight_layout=True, sharex=False)
+ax[0].plot(bins_t, kde0t(bins_t), color='#0072B2', label=r'$a=0$')
+ax[0].axvline(bins_t[np.where(kde0t(bins_t) == np.max(kde0t(bins_t)))], color='#0072B2', ls='--', alpha=0.5)
+ax[0].plot(bins_t, kde9t(bins_t), color='#E69F00', label=r'$a=0.9375$')
+ax[0].axvline(bins_t[np.where(kde9t(bins_t) == np.max(kde9t(bins_t)))], color='#E69F00', ls='--', alpha=0.5)
+ax[0].set_title('MAD Flare Durations')
+ax[0].set_xlabel('Flare Durations (in M)')
+ax[0].set_ylabel('Probability Density')
+ax[0].legend()
+ax[1].plot(bins_T, kde0T(bins_T), color='#0072B2', label=r'$a=0$')
+ax[1].axvline(bins_T[np.where(kde0T(bins_T) == np.max(kde0T(bins_T)))], color='#0072B2', ls='--', alpha=0.5)
+ax[1].plot(bins_T, kde9T(bins_T), color='#E69F00', label=r'$a=0.9375$')
+ax[1].axvline(bins_T[np.where(kde9T(bins_T) == np.max(kde9T(bins_T)))], color='#E69F00', ls='--', alpha=0.5)
+ax[1].set_title('MAD Inter Flare Durations')
+ax[1].set_xlabel('Inter Flare Durations (in M)')
+ax[1].set_ylabel('Probability Density')
+ax[1].legend()
+plt.savefig('plots_mayank/test.png')
+
+fig, ax = plt.subplots(2, figsize=(7,5), tight_layout=True, sharex=False)
 ax[0].hist(mad_delt, bins=bins, color='black')
 ax[0].set_title('MAD')
 ax[1].hist(nonmad_delt, bins=bins, color='black')
