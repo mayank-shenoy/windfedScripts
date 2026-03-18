@@ -1149,6 +1149,94 @@ def mk_grframe_triple(is_magnetic=True):
                         os.system("mkdir -p frames_mayank")
                         plt.savefig(fname)
 
+def mk_grframe_triple_rot(is_magnetic=True):
+	set_dump_range_gr()
+	print("Processing dumps ",i_start," to ",i_end)
+	for i_dump in range(i_start,i_end):
+		print("Framing dump %d" %i_dump)
+		fname = "frames_mayank/rotated_sheet_frame_%04d.png" %i_dump
+		if os.path.isfile(fname):
+			dummy = i_dump
+		else:
+			plt.figure(1)
+			plt.clf()
+			a = 0
+			rplus = 1.+ np.sqrt(1-a**2)
+			th = np.linspace(0.,2*np.pi,1000)
+			xh = rplus*np.sin(th)
+			yh = rplus*np.cos(th)
+			asc.rd_1d_avg()
+			ir = asc.r_to_ir(2)
+			# asc.yt_extract_box(i_dump=i_dump+1, box_radius=7.5, mhd=True, gr=True, a=0.9375)
+			# far_post = F(asc.g, asc.Lower(asc.uu,asc.g), asc.bd)
+			asc.yt_extract_box_rotated(i_dump=i_dump, box_radius=10, mhd=True, gr=True, a=a, th_tilt=np.pi/2, phi_tilt=np.pi/2)
+			# far = F(asc.g, asc.Lower(asc.uu,asc.g), asc.bd)
+			# cur, cur_mag = J(asc.g,asc.gi,far,far_post,asc.x,asc.y,asc.z)
+			gamma=5/3
+			sigma = asc.bsq / (asc.rho + gamma/(gamma-1) * asc.press)
+			temp = asc.press/asc.rho
+			# beta = 2*asc.press/asc.bsq
+			# R = np.sqrt(asc.x**2+asc.y**2+asc.z**2)
+			# r = np.sqrt( R**2 -a**2 + np.sqrt( (R**2-a**2)**2 + 4.0*(a*asc.z)**2.0 ) )/np.sqrt(2.0)
+			uu_ks = asc.cks_vec_to_ks(asc.uu,asc.x,asc.y,asc.z,0,0,a)
+			vr = uu_ks[1]/uu_ks[0]
+			bu_ks = asc.cks_vec_to_ks(asc.bu,asc.x,asc.y,asc.z,0,0,a)
+			bphi = (bu_ks[3] * uu_ks[0] - bu_ks[0] * uu_ks[3])
+			rr = np.sqrt(asc.x[:,64,:]**2+asc.z[:,64,:]**2)
+			maskbh = rr<rplus
+			sigma_slice = sigma[:,64,:]
+			sigma_slice[maskbh] = sigma_slice.max()
+			ang = np.arctan2(asc.Bcc3[:,64,:], asc.Bcc1[:,64,:])
+			da_x, da_y = np.gradient(ang)
+			a_gradmag = np.sqrt(da_x**2+da_y**2)
+			mask = cleanup(sigma_slice, a_gradmag, rr, rplus)
+			sk_r, sk_z, l = sheet(mask, sigma_slice, asc.x[:,64,:], asc.z[:,64,:])
+			fig = plt.figure(figsize=(13.65,6), tight_layout=True)
+			gs1 = grd.GridSpec(2,3,height_ratios=[2,1])
+			gs1.update(wspace=0.4, right=0.92, hspace=0.5, left=0.05)
+			ax0 = fig.add_subplot(gs1[0,0])
+			ax1 = fig.add_subplot(gs1[0,1])
+			ax2 = fig.add_subplot(gs1[0,2])
+			gs2 = grd.GridSpec(2,1,height_ratios=[2,1])
+			ax3 = fig.add_subplot(gs2[1,0])
+			ax0.set_aspect('equal', adjustable='box')
+			ax1.set_aspect('equal', adjustable='box')
+			ax2.set_aspect('equal', adjustable='box')
+			ax0.set_xlim(asc.x.min(), asc.x.max())
+			ax0.set_ylim(asc.y.min(), asc.y.max())
+			ax1.set_xlim(asc.x.min(), asc.x.max())
+			ax1.set_ylim(asc.z.min(), asc.z.max())
+			ax2.set_xlim(asc.x.min(), asc.x.max())
+			ax2.set_ylim(asc.z.min(), asc.z.max())
+			h = ax0.pcolormesh(asc.x[:,:,64], asc.y[:,:,64], vr[:,:,64], cmap='bwr', vmin=-0.2, vmax=0.2)
+			fig.colorbar(h,ax=ax0,label=r'$v^r$',fraction=0.046, pad=0.04)
+			ax0.streamplot(asc.x[:,:,64].transpose(), asc.y[:,:,64].transpose(), asc.Bcc1[:,:,64].transpose(), asc.Bcc2[:,:,64].transpose(), color='black', linewidth=0.5, density=2, arrowsize=0.5)
+			ax0.fill(xh,yh,'k', zorder=10)
+			ax0.set_xlabel(r'$x$ ($r_G$)')
+			ax0.set_ylabel(r'$y$ ($r_G$)')
+			f = ax1.pcolormesh(asc.x[:,64,:], asc.z[:,64,:], np.log10(sigma[:,64,:]), cmap='plasma', vmin=-1, vmax=2)
+			fig.colorbar(f,ax=ax1,label=r'$\log_{10}(\sigma)$',fraction=0.046, pad=0.04)
+			ax1.streamplot(asc.x[:,64,:].transpose(), asc.z[:,64,:].transpose(), asc.Bcc1[:,64,:].transpose(), asc.Bcc3[:,64,:].transpose(), color='black', linewidth=0.5, density=2, arrowsize=0.5)
+			ax1.contour(asc.x[:,64,:], asc.z[:,64,:], sigma[:,64,:]<1, levels=[0.5], colors='cyan', linewidths=1)
+			ax1.contour(asc.x[:,64,:], asc.z[:,64,:], sigma[:,64,:]<10, levels=[0.5], colors='green', linewidths=1)
+			ax1.scatter(sk_r, sk_z, s=1, color='black', alpha=0.5)
+			ax1.fill(xh,yh,'k', zorder=10)
+			ax1.set_xlabel(r'$x$ ($r_G$)')
+			ax1.set_ylabel(r'$z$ ($r_G$)')
+			g = ax2.pcolormesh(asc.x[:,64,:], asc.z[:,64,:], np.log10(temp[:,64,:]), cmap='viridis', vmin=-1, vmax=0)
+			fig.colorbar(g,ax=ax2,label=r'$\log_{10}(T)$',fraction=0.046, pad=0.04)
+			ax2.streamplot(asc.x[:,64,:].transpose(), asc.z[:,64,:].transpose(), asc.Bcc1[:,64,:].transpose(), asc.Bcc3[:,64,:].transpose(), color='gray', linewidth=0.5, density=2, arrowsize=0.5)
+			ax2.fill(xh,yh,'k', zorder=10)
+			ax2.set_xlabel(r'$x$ ($r_G$)')
+			ax2.set_ylabel(r'$z$ ($r_G$)')
+			fig.suptitle('t=%iM'%asc.t[i_dump])
+			ax3.plot(asc.t, asc.Phibh[:,ir], color='black')
+			ax3.axvline(asc.t[i_dump], color='black', ls='--')
+			ax3.scatter(asc.t[i_dump], asc.Phibh[i_dump,ir], color='red',alpha=0.5)
+			ax3.set_xlabel('Time t (in M)')
+			ax3.set_ylabel(r'$\Phi_\text{BH}$')
+			os.system("mkdir -p frames_mayank")
+			plt.savefig(fname)
 
 def mk_grframe_sheet(is_magnetic=True):
         set_dump_range_gr()
@@ -3658,6 +3746,8 @@ if __name__ == "__main__":
 		mk_grframe_double(is_magnetic = mhd_switch)
 	elif m_type == "mk_frame_triple":
 		mk_grframe_triple(is_magnetic = mhd_switch)
+	elif m_type == "mk_frame_triple_rot":
+		mk_grframe_triple_rot(is_magnetic = mhd_switch)
 	elif m_type == "mk_frame_sheet":
 		mk_grframe_sheet(is_magnetic = mhd_switch)
 	elif m_type == "mk_frame_total":
