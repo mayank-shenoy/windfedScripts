@@ -1170,7 +1170,7 @@ def mk_grframe_triple_rot(is_magnetic=True):
 			ir = asc.r_to_ir(2)
 			# asc.yt_extract_box(i_dump=i_dump+1, box_radius=7.5, mhd=True, gr=True, a=0.9375)
 			# far_post = F(asc.g, asc.Lower(asc.uu,asc.g), asc.bd)
-			asc.yt_extract_box_rotated(i_dump=i_dump, box_radius=10, mhd=True, gr=True, a=a, th_tilt=np.pi/2, phi_tilt=np.pi/2)
+			asc.yt_extract_box_rotated(i_dump=i_dump, box_radius=7.5, mhd=True, gr=True, a=a, th_tilt=np.pi/2, phi_tilt=np.pi/2)
 			# far = F(asc.g, asc.Lower(asc.uu,asc.g), asc.bd)
 			# cur, cur_mag = J(asc.g,asc.gi,far,far_post,asc.x,asc.y,asc.z)
 			gamma=5/3
@@ -1217,7 +1217,7 @@ def mk_grframe_triple_rot(is_magnetic=True):
 			ax0.set_ylabel(r'$y$ ($r_G$)')
 			f = ax1.pcolormesh(asc.x[:,64,:], asc.z[:,64,:], np.log10(sigma[:,64,:]), cmap='plasma', vmin=-1, vmax=2)
 			fig.colorbar(f,ax=ax1,label=r'$\log_{10}(\sigma)$',fraction=0.046, pad=0.04)
-			ax1.streamplot(asc.x[:,64,:].transpose(), asc.z[:,64,:].transpose(), asc.Bcc1[:,64,:].transpose(), asc.Bcc3[:,64,:].transpose(), color='black', linewidth=0.5, density=2, arrowsize=0.5)
+			ax1.streamplot(asc.x[:,64,:].transpose(), asc.z[:,64,:].transpose(), asc.Bcc1[:,64,:].transpose(), asc.Bcc3[:,64,:].transpose(), color='gray', linewidth=0.5, density=2, arrowsize=0.5)
 			ax1.contour(asc.x[:,64,:], asc.z[:,64,:], sigma[:,64,:]<1, levels=[0.5], colors='cyan', linewidths=1)
 			ax1.contour(asc.x[:,64,:], asc.z[:,64,:], sigma[:,64,:]<10, levels=[0.5], colors='green', linewidths=1)
 			ax1.scatter(sk_r, sk_z, s=1, color='black', alpha=0.5)
