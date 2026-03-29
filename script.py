@@ -1147,7 +1147,70 @@ for j in range(360):
     # d.append(diff)
     
 
+a=0
+rplus = 1 + np.sqrt(1 - a**2)
+theta = np.linspace(0, 2*np.pi, 1000)
+xh = rplus * np.sin(theta)
+yh = rplus * np.cos(theta)
+i = 6063
+yt_extract_box(i_dump=i, box_radius=10, mhd=True, gr=True, a=a)
+gamma=5/3
+j = 0
+rho_slice, coords, r_slice, z_slice = slice(rho, np.cos(np.pi*j/180), np.sin(np.pi*j/180), 10)
+press_slice = slice(press, np.cos(np.pi*j/180), np.sin(np.pi*j/180), 10)[0]
+bsq_slice = slice(bsq, np.cos(np.pi*j/180), np.sin(np.pi*j/180), 10)[0]
+sigma_slice = bsq_slice / (rho_slice + gamma/(gamma-1) * press_slice)
+mask_s = sigma_slice<10
+sk = skeletonize(mask_s).astype(bool)
+mp_r, mp_z = r_slice[sk], z_slice[sk]
+theta = np.arctan2(mp_z, mp_r)
+m = np.mean(theta[len(theta)//8:len(theta)//2])
+yt_extract_box_rotated(i_dump=i, box_radius=10, mhd=True, gr=True, a=a,  th_tilt=-m, phi_tilt=j*np.pi/180)
+gamma = 5/3
+uu_ks = cks_vec_to_ks(uu,x,y,z,0,0,a)
+bu_ks = cks_vec_to_ks(bu,x,y,z,0,0,a)
+rho_slice = rho[:,:,64]
+press_slice = press[:,:,64]
+bsq_slice = bsq[:,:,64]
+sigma_slice = bsq_slice / (rho_slice + gamma/(gamma-1) * press_slice)
+temp_slice = press_slice/rho_slice
+bz_slice = (Bcc3**2/(Bcc1**2 + Bcc2**2))[:,:,64]
+vr_slice = (uu_ks[1]/uu_ks[0])[:,:,64]
+r_slice = x[:,:,64]
+z_slice = y[:,:,64]
 
+plt.figure()
+plt.pcolormesh(r_slice, z_slice, vr_slice, cmap='managua', vmin=-0.2, vmax=0.2)
+plt.colorbar(label=r'$v^r$')
+
+rr = np.sqrt(r_slice**2 + z_slice**2)
+maskbh = rr<rplus
+vr_slice[maskbh] = vr_slice.min()
+mask_vr = (vr_slice>0) & (rr<5)
+mn = np.mean(vr_slice[mask_vr])
+labeled, num = label(mask_vr)
+for i in range(num+1):
+    if np.mean(vr_slice[labeled==i]) < mn:
+        mask_vr[labeled==i] = False
+labeled, num = label(mask_vr)
+
+for i in range(1,num+1):
+    [n]=np.where(rr[labeled==i]==rr[labeled==i].min())
+    if len(n)==1:
+        [n0] = n
+        r_c, z_c = r_slice[labeled==i][n0], z_slice[labeled==i][n0]
+        x_l = np.sign(r_c)* np.linspace(0,np.abs(2*r_c),6)
+        print(np.arctan2(z_c,r_c)*180/np.pi)
+        plt.plot(x_l, z_c/r_c*x_l, color='black', ls='--', linewidth=1, zorder=10)
+    else:
+        for n0 in n:
+            r_c, z_c = r_slice[labeled==i][n0], z_slice[labeled==i][n0]
+            x_l = np.sign(r_c)* np.linspace(0,np.abs(2*r_c),6)
+            print(np.arctan2(z_c,r_c)*180/np.pi)
+            plt.plot(x_l, z_c/r_c*x_l, color='black', ls='--', linewidth=1, zorder=10)
+plt.savefig('plots_mayank/test.png')
+
+j = np.arctan2(z_c,r_c)*180/np.pi
 
 
 
@@ -1161,7 +1224,7 @@ rplus = 1 + np.sqrt(1 - a**2)
 theta = np.linspace(0, 2*np.pi, 1000)
 xh = rplus * np.sin(theta)
 yh = rplus * np.cos(theta)
-i=6089
+i=6058
 yt_extract_box(i_dump=i, box_radius=10, mhd=True, gr=True, a=a)
 gamma=5/3
 for j in range(360):
@@ -1186,6 +1249,7 @@ for j in range(360):
     bsq_slice = slice(bsq, np.cos(np.pi*j/180), np.sin(np.pi*j/180), 10)[0]
     bu1_slice, bu2_slice = project(bu[1,:,:,:], bu[2,:,:,:], bu[3,:,:,:], coords, np.cos(np.pi*j/180), np.sin(np.pi*j/180))
     sigma_slice = bsq_slice / (rho_slice + gamma/(gamma-1) * press_slice)
+    temp_slice = press_slice/rho_slice
     bz_slice = slice(Bcc3**2/(Bcc1**2 + Bcc2**2), np.cos(np.pi*j/180), np.sin(np.pi*j/180), 10)[0]
     br_slice = slice((bu_ks[1] * uu_ks[0] - bu_ks[0] * uu_ks[1]), np.cos(np.pi*j/180), np.sin(np.pi*j/180), 10)[0]
     vr_slice = slice(uu_ks[1]/uu_ks[0], np.cos(np.pi*j/180), np.sin(np.pi*j/180), 10)[0]
@@ -1198,18 +1262,22 @@ for j in range(360):
     sigma_slice2[maskbh] = sigma_slice2.max()
     ax[0,0].contour(r_slice, z_slice, sigma_slice2, levels=[1], colors='cyan', linewidths=1.5)
     ax[0,0].contour(r_slice, z_slice, sigma_slice2, levels=[10], colors='green', linewidths=1.5)
-    g = ax[0,1].pcolormesh(r_slice, z_slice, br_slice, cmap='PRGn', vmin=-0.2, vmax=0.2)
-    fig.colorbar(g,ax=ax[0,1],label=r'$B^r$')
+    g = ax[0,1].pcolormesh(r_slice, z_slice, np.log10(temp_slice), cmap='viridis', vmin=-1, vmax=0)
+    fig.colorbar(g,ax=ax[0,1],label=r'$\log_{10}(T)$')
+    temp_slice2 = np.copy(temp_slice)
+    temp_slice2[maskbh] = temp_slice2.min()
+    np.sum(temp_slice2<1)
+    ax[0,1].contour(r_slice, z_slice, temp_slice2, levels=[1], colors='magenta', linewidths=1.5)
     h = ax[1,0].pcolormesh(r_slice, z_slice, np.log10(bz_slice), cmap='bwr', vmin=-1, vmax=1)
     fig.colorbar(h,ax=ax[1,0],label=r'$\log_{10}(\frac{B_z^2}{B_x^2+B_y^2})$')
-    k = ax[1,1].pcolormesh(r_slice, z_slice, vr_slice, cmap='PuOr', vmin=-0.2, vmax=0.2)
+    k = ax[1,1].pcolormesh(r_slice, z_slice, vr_slice, cmap='managua', vmin=-0.2, vmax=0.2)
     fig.colorbar(k,ax=ax[1,1],label=r'$v^r$')
     fig.suptitle(r'$\phi=%d^\circ$'% j)
     for axes in ax.flatten():
         axes.set_xlabel(r'$x/r_G$')
         axes.set_ylabel(r'$z/r_G$')
         axes.set_aspect('equal', adjustable='box')
-        axes.fill(xh,yh,'k')
+        axes.fill(xh,yh,'k', zorder=10)
         axes.set_xlim(r_slice.min(), r_slice.max())
         axes.set_ylim(z_slice.min(), z_slice.max())
         axes.streamplot(r_slice.transpose(), z_slice.transpose(), bu1_slice.transpose(), bu2_slice.transpose(), color='black', linewidth=0.5, density=2, arrowsize=0.5)
@@ -1221,25 +1289,25 @@ rplus = 1 + np.sqrt(1 - a**2)
 theta = np.linspace(0, 2*np.pi, 1000)
 xh = rplus * np.sin(theta)
 yh = rplus * np.cos(theta)
-for i in range(6035,6077):
+for i in range(472,478):
     print('Dump %d'%i)
     yt_extract_box(i_dump=i, box_radius=10, mhd=True, gr=True, a=a)
-    gamma=5/3
-    j0 = 200
-    rho_slice, coords, r_slice, z_slice = slice(rho, np.cos(np.pi*j0/180), np.sin(np.pi*j0/180), 10)
-    press_slice = slice(press, np.cos(np.pi*j0/180), np.sin(np.pi*j0/180), 10)[0]
-    bsq_slice = slice(bsq, np.cos(np.pi*j0/180), np.sin(np.pi*j0/180), 10)[0]
-    sigma_slice = bsq_slice / (rho_slice + gamma/(gamma-1) * press_slice)
-    mask_s = sigma_slice<10
-    sk = skeletonize(mask_s).astype(bool)
-    mp_r, mp_z = r_slice[sk], z_slice[sk]
-    theta = np.arctan2(mp_z, mp_r)
-    m = np.mean(theta[len(theta)//8:len(theta)//2])
-    yt_extract_box_rotated(i_dump=i, box_radius=10, mhd=True, gr=True, a=a,  th_tilt=-m, phi_tilt=j0*np.pi/180)
+    # gamma=5/3
+    # j0 = 190
+    # rho_slice, coords, r_slice, z_slice = slice(rho, np.cos(np.pi*j0/180), np.sin(np.pi*j0/180), 10)
+    # press_slice = slice(press, np.cos(np.pi*j0/180), np.sin(np.pi*j0/180), 10)[0]
+    # bsq_slice = slice(bsq, np.cos(np.pi*j0/180), np.sin(np.pi*j0/180), 10)[0]
+    # sigma_slice = bsq_slice / (rho_slice + gamma/(gamma-1) * press_slice)
+    # mask_s = sigma_slice<10
+    # sk = skeletonize(mask_s).astype(bool)
+    # mp_r, mp_z = r_slice[sk], z_slice[sk]
+    # theta = np.arctan2(mp_z, mp_r)
+    # m = np.mean(theta[len(theta)//8:len(theta)//2])
+    # yt_extract_box_rotated(i_dump=i, box_radius=10, mhd=True, gr=True, a=a,  th_tilt=-m, phi_tilt=j0*np.pi/180)
     gamma = 5/3
     uu_ks = cks_vec_to_ks(uu,x,y,z,0,0,a)
     bu_ks = cks_vec_to_ks(bu,x,y,z,0,0,a)
-    j = 0
+    j = 300
     rho_slice, coords, r_slice, z_slice = slice(rho, np.cos(np.pi*j/180), np.sin(np.pi*j/180), 10)
     press_slice = slice(press, np.cos(np.pi*j/180), np.sin(np.pi*j/180), 10)[0]
     bsq_slice = slice(bsq, np.cos(np.pi*j/180), np.sin(np.pi*j/180), 10)[0]
@@ -1264,18 +1332,18 @@ for i in range(6035,6077):
     ax[0,1].contour(r_slice, z_slice, temp_slice2, levels=[1], colors='magenta', linewidths=1.5)
     h = ax[1,0].pcolormesh(r_slice, z_slice, np.log10(bz_slice), cmap='bwr', vmin=-1, vmax=1)
     fig.colorbar(h,ax=ax[1,0],label=r'$\log_{10}(\frac{B_z^2}{B_x^2+B_y^2})$')
-    k = ax[1,1].pcolormesh(r_slice, z_slice, vr_slice, cmap='PuOr', vmin=-0.2, vmax=0.2)
+    k = ax[1,1].pcolormesh(r_slice, z_slice, vr_slice, cmap='managua', vmin=-0.2, vmax=0.2)
     fig.colorbar(k,ax=ax[1,1],label=r'$v^r$')
     fig.suptitle(r'$t=%dM$'% i)
     for axes in ax.flatten():
         axes.set_xlabel(r'$x/r_G$')
         axes.set_ylabel(r'$z/r_G$')
         axes.set_aspect('equal', adjustable='box')
-        axes.fill(xh,yh,'k')
+        axes.fill(xh,yh,'k', zorder=10)
         axes.set_xlim(r_slice.min(), r_slice.max())
         axes.set_ylim(z_slice.min(), z_slice.max())
-        axes.streamplot(r_slice.transpose(), z_slice.transpose(), bu1_slice.transpose(), bu2_slice.transpose(), color='black', linewidth=0.5, density=2, arrowsize=0.5)
-    plt.savefig('plots_mayank/poloidal_%04d_%03d.png'%(i,j0))
+        axes.streamplot(r_slice.transpose(), z_slice.transpose(), bu1_slice.transpose(), bu2_slice.transpose(), color='gray', linewidth=0.5, density=2, arrowsize=0.5)
+    plt.savefig('plots_mayank/poloidal_%04d_%03d.png'%(i,j))
     
 #midplane video
 a=0
@@ -1283,7 +1351,8 @@ rplus = 1 + np.sqrt(1 - a**2)
 theta = np.linspace(0, 2*np.pi, 1000)
 xh = rplus * np.sin(theta)
 yh = rplus * np.cos(theta)
-for i in range(6035,6077):
+# angle = []
+for i in range(6035,6109):
     print('Dump %d'%i)
     yt_extract_box(i_dump=i, box_radius=10, mhd=True, gr=True, a=a)
     gamma=5/3
@@ -1297,6 +1366,7 @@ for i in range(6035,6077):
     mp_r, mp_z = r_slice[sk], z_slice[sk]
     theta = np.arctan2(mp_z, mp_r)
     m = np.mean(theta[len(theta)//8:len(theta)//2])
+    # angle.append(m*180/np.pi)
     yt_extract_box_rotated(i_dump=i, box_radius=10, mhd=True, gr=True, a=a,  th_tilt=-m, phi_tilt=j*np.pi/180)
     gamma = 5/3
     uu_ks = cks_vec_to_ks(uu,x,y,z,0,0,a)
@@ -1325,15 +1395,108 @@ for i in range(6035,6077):
     ax[0,1].contour(r_slice, z_slice, temp_slice2, levels=[1], colors='magenta', linewidths=1.5)
     h = ax[1,0].pcolormesh(r_slice, z_slice, np.log10(bz_slice), cmap='bwr', vmin=-1, vmax=1)
     fig.colorbar(h,ax=ax[1,0],label=r'$\log_{10}(\frac{B_z^2}{B_x^2+B_y^2})$')
-    k = ax[1,1].pcolormesh(r_slice, z_slice, vr_slice, cmap='PuOr', vmin=-0.2, vmax=0.2)
+    k = ax[1,1].pcolormesh(r_slice, z_slice, vr_slice, cmap='managua', vmin=-0.2, vmax=0.2)
     fig.colorbar(k,ax=ax[1,1],label=r'$v^r$')
     fig.suptitle(r'$t=%dM$'% i)
     for axes in ax.flatten():
         axes.set_xlabel(r'$x/r_G$')
         axes.set_ylabel(r'$z/r_G$')
         axes.set_aspect('equal', adjustable='box')
-        axes.fill(xh,yh,'k')
+        axes.fill(xh,yh,'k', zorder=10)
         axes.set_xlim(r_slice.min(), r_slice.max())
         axes.set_ylim(z_slice.min(), z_slice.max())
-        axes.streamplot(r_slice.transpose(), z_slice.transpose(), Bcc1[:,:,64].transpose(), Bcc2[:,:,64].transpose(), color='black', linewidth=0.5, density=2, arrowsize=0.5)
-    plt.savefig('plots_mayank/poloidal_%04d_%03d.png'%(i,j0))
+        axes.streamplot(r_slice.transpose(), z_slice.transpose(), Bcc1[:,:,64].transpose(), Bcc2[:,:,64].transpose(), color='gray', linewidth=0.5, density=2, arrowsize=0.5)
+    plt.savefig('plots_mayank/midplane_%04d.png'%i)
+    
+
+#tracking video
+a=0
+rplus = 1 + np.sqrt(1 - a**2)
+theta = np.linspace(0, 2*np.pi, 1000)
+xh = rplus * np.sin(theta)
+yh = rplus * np.cos(theta)
+phi=51
+for i in range(6062,6072):
+    print('Dump %d'%i)
+    yt_extract_box(i_dump=i, box_radius=10, mhd=True, gr=True, a=a)
+    gamma=5/3
+    j0 = 0
+    rho_slice, coords, r_slice, z_slice = slice(rho, np.cos(np.pi*j0/180), np.sin(np.pi*j0/180), 10)
+    press_slice = slice(press, np.cos(np.pi*j0/180), np.sin(np.pi*j0/180), 10)[0]
+    bsq_slice = slice(bsq, np.cos(np.pi*j0/180), np.sin(np.pi*j0/180), 10)[0]
+    sigma_slice = bsq_slice / (rho_slice + gamma/(gamma-1) * press_slice)
+    mask_s = sigma_slice<10
+    sk = skeletonize(mask_s).astype(bool)
+    mp_r, mp_z = r_slice[sk], z_slice[sk]
+    theta = np.arctan2(mp_z, mp_r)
+    m = np.mean(theta[len(theta)//8:len(theta)//2])
+
+    yt_extract_box_rotated(i_dump=i, box_radius=10, mhd=True, gr=True, a=a,  th_tilt=-m, phi_tilt=j0*np.pi/180)
+    gamma = 5/3
+    uu_ks = cks_vec_to_ks(uu,x,y,z,0,0,a)
+    vr_xy = (uu_ks[1]/uu_ks[0])[:,:,64]
+    rr = np.sqrt(x[:,:,64]**2 + y[:,:,64]**2)
+    maskbh = rr<rplus
+    vr_xy[maskbh] = vr_xy.min()
+    mask_vr = (vr_xy>0) & (rr<=5)
+    mn = np.mean(vr_xy[mask_vr])
+    labeled, num = label(mask_vr)
+    for k in range(num+1):
+        if np.mean(vr_xy[labeled==k]) < mn:
+            mask_vr[labeled==k] = False
+    labeled, num = label(mask_vr)
+    angle = []
+    for k in range(1,num+1):
+        [n] = np.where(rr[labeled==k]==rr[labeled==k].min())
+        if len(n)==1:
+            [n0] = n
+            r_c, z_c = x[:,:,64][labeled==k][n0], y[:,:,64][labeled==k][n0]
+            angle.append(np.arctan2(z_c,r_c)*180/np.pi)
+        else:
+            for n0 in n:
+                r_c, z_c = x[:,:,64][labeled==k][n0], y[:,:,64][labeled==k][n0]
+                angle.append(np.arctan2(z_c,r_c)*180/np.pi)
+    print(angle)
+    if i == 6062:
+        j = phi
+    else:
+        j = angle[np.argmin(np.abs(np.array(angle) - phi))]
+    print(j)
+    phi = j
+    rho_slice, coords, r_slice, z_slice = slice(rho, np.cos(np.pi*j/180), np.sin(np.pi*j/180), 10)
+    press_slice = slice(press, np.cos(np.pi*j/180), np.sin(np.pi*j/180), 10)[0]
+    bsq_slice = slice(bsq, np.cos(np.pi*j/180), np.sin(np.pi*j/180), 10)[0]
+    bu1_slice, bu2_slice = project(bu[1,:,:,:], bu[2,:,:,:], bu[3,:,:,:], coords, np.cos(np.pi*j/180), np.sin(np.pi*j/180))
+    sigma_slice = bsq_slice / (rho_slice + gamma/(gamma-1) * press_slice)
+    temp_slice = press_slice/rho_slice
+    bz_slice = slice(Bcc3**2/(Bcc1**2 + Bcc2**2), np.cos(np.pi*j/180), np.sin(np.pi*j/180), 10)[0]
+    vr_slice = slice(uu_ks[1]/uu_ks[0], np.cos(np.pi*j/180), np.sin(np.pi*j/180), 10)[0]
+    clf()
+    fig, ax = plt.subplots(2,2, figsize=(8,6), tight_layout=True)
+    f = ax[0,0].pcolormesh(r_slice, z_slice, np.log10(sigma_slice), cmap='plasma', vmin=-1, vmax=2)
+    fig.colorbar(f,ax=ax[0,0],label=r'$\log_{10}(\sigma)$')
+    maskbh = (r_slice**2 + z_slice**2) < rplus**2
+    sigma_slice2 = np.copy(sigma_slice)
+    sigma_slice2[maskbh] = sigma_slice2.max()
+    ax[0,0].contour(r_slice, z_slice, sigma_slice2, levels=[1], colors='cyan', linewidths=1.5)
+    ax[0,0].contour(r_slice, z_slice, sigma_slice2, levels=[10], colors='green', linewidths=1.5)
+    g = ax[0,1].pcolormesh(r_slice, z_slice, np.log10(temp_slice), cmap='viridis', vmin=-1, vmax=0)
+    fig.colorbar(g,ax=ax[0,1],label=r'$\log_{10}(T)$')
+    temp_slice2 = np.copy(temp_slice)
+    temp_slice2[maskbh] = temp_slice2.min()
+    ax[0,1].contour(r_slice, z_slice, temp_slice2, levels=[1], colors='magenta', linewidths=1.5)
+    h = ax[1,0].pcolormesh(r_slice, z_slice, np.log10(bz_slice), cmap='bwr', vmin=-1, vmax=1)
+    fig.colorbar(h,ax=ax[1,0],label=r'$\log_{10}(\frac{B_z^2}{B_x^2+B_y^2})$')
+    k = ax[1,1].pcolormesh(r_slice, z_slice, vr_slice, cmap='managua', vmin=-0.2, vmax=0.2)
+    fig.colorbar(k,ax=ax[1,1],label=r'$v^r$')
+    fig.suptitle(r'$t=%dM$, $\theta=%0.2f^\circ$'%(i,j))
+    for axes in ax.flatten():
+        axes.set_xlabel(r'$x/r_G$')
+        axes.set_ylabel(r'$z/r_G$')
+        axes.set_aspect('equal', adjustable='box')
+        axes.fill(xh,yh,'k', zorder=10)
+        axes.set_xlim(r_slice.min(), r_slice.max())
+        axes.set_ylim(z_slice.min(), z_slice.max())
+        axes.streamplot(r_slice.transpose(), z_slice.transpose(), bu1_slice.transpose(), bu2_slice.transpose(), color='gray', linewidth=0.5, density=2, arrowsize=0.5)
+    plt.savefig('plots_mayank/tracked_%04d_%03d.png'%(i,j))
+  
