@@ -1147,100 +1147,12 @@ for j in range(360):
     # diff = np.sum(sigma_slice2<=10) - np.sum(sigma_slice2<=1)
     # d.append(diff)
     
-# ORIGINAL TRACKING
-a=0
-rplus = 1 + np.sqrt(1 - a**2)
-theta = np.linspace(0, 2*np.pi, 1000)
-xh = rplus * np.sin(theta)
-yh = rplus * np.cos(theta)
-rd_1d_avg()
-ir = r_to_ir(2)
-c = 0
-i_dump = 6038
-# for i_dump in range(6033, 6077):
-print(r'Plotting dump %d'%i_dump)
-yt_extract_box(i_dump=i_dump, box_radius=10, mhd=True, gr=True, a=a)
-gamma=5/3
-j = 0
-rho_slice, coords, r_slice, z_slice = slice(rho, np.cos(np.pi*j/180), np.sin(np.pi*j/180), 10)
-press_slice = slice(press, np.cos(np.pi*j/180), np.sin(np.pi*j/180), 10)[0]
-bsq_slice = slice(bsq, np.cos(np.pi*j/180), np.sin(np.pi*j/180), 10)[0]
-sigma_slice = bsq_slice / (rho_slice + gamma/(gamma-1) * press_slice)
-mask_s = sigma_slice<10
-sk = skeletonize(mask_s).astype(bool)
-mp_r, mp_z = r_slice[sk], z_slice[sk]
-theta = np.arctan2(mp_z, mp_r)
-m = np.mean(theta[len(theta)//8:len(theta)//2])
-yt_extract_box_rotated(i_dump=i_dump, box_radius=10, mhd=True, gr=True, a=a,  th_tilt=-m, phi_tilt=j*np.pi/180)
-gamma = 5/3
-r_slice = x[:,:,64]
-z_slice = y[:,:,64]
-rr = np.sqrt(r_slice**2 + z_slice**2)
-maskbh = rr<rplus
-rho_slice = rho[:,:,64]
-press_slice = press[:,:,64]
-temp_slice = press_slice/rho_slice
-temp_slice[maskbh] = temp_slice.min()
-mask_t = temp_slice>1
-labeled, num = label(mask_t)
-n = num
-for i in range(1, num+1):
-    if rr[labeled == i].min() > 1.1*rplus:
-        mask_t[labeled == i] = False
-        n = n-1
-uu_ks = cks_vec_to_ks(uu,x,y,z,0,0,a)
-vr_slice = (uu_ks[1]/uu_ks[0])[:,:,64]
-vr_slice[maskbh] = vr_slice.min()
-plt.figure()
-plt.pcolormesh(r_slice, z_slice, vr_slice, cmap='managua', vmin=-0.2, vmax=0.2)
-plt.colorbar(label=r'$v^r$')
-plt.contour(r_slice, z_slice, mask_t, levels=[0.5], colors='green', linewidths=1.5)
-if n > 0:
-    [m], [n] = np.where(temp_slice == temp_slice[mask_t].max())
-    r_c, z_c = r_slice[m,n], z_slice[m,n]
-    x_l = np.linspace(0,10*np.cos(np.arctan2(z_c,r_c)),6)
-    phi = np.degrees(np.arctan2(z_c,r_c))
-    plt.plot(x_l, z_c/r_c*x_l, color='black', ls='--', linewidth=1, zorder=10)
-else:
-    angle = []
-    temp_count = []
-    mask_vr = (vr_slice>0) & (rr<=2.5*rplus)
-    labeled, num = label(mask_vr)
-    for i in range(1,num+1):
-        n = np.where(rr[labeled==i]==rr[labeled==i].min())[0]
-        for n0 in n:
-            r_c, z_c = r_slice[labeled==i][n0], z_slice[labeled==i][n0]
-            x_l = np.linspace(0,10*np.cos(np.arctan2(z_c,r_c)),6)
-            j = np.arctan2(z_c,r_c)
-            angle.append(np.degrees(j))
-            plt.plot(x_l, z_c/r_c*x_l, color='magenta', ls='--', linewidth=1, zorder=10)
-            rho_slice, coords, r_slice, z_slice = slice(rho, np.cos(j), np.sin(j), 10)
-            press_slice = slice(press, np.cos(j), np.sin(j), 10)[0]
-            temp_slice = press_slice/rho_slice
-            rr = np.sqrt(r_slice**2 + z_slice**2)
-            maskbh = rr<rplus
-            temp_slice[maskbh] = temp_slice.min()
-            mask_t = temp_slice>1
-            temp_count.append(np.sum(mask_t))
-    if c==0:
-        phi = angle[np.argmax(temp_count)]
-    else:
-        angle = np.array(angle)
-        angle[angle < 0] = angle[angle < 0] + 360
-        diff = angle - phi0
-        score = temp_count/diff
-        phi = angle[np.argmax(score)]
-    x_l = np.linspace(0,10*np.cos(np.radians(phi)),6)
-    plt.plot(x_l, np.tan(np.radians(phi))*x_l, color='black', ls='--', linewidth=1, zorder=10)
-plt.xlabel(r'$x/r_G$')
-plt.ylabel(r'$y/r_G$')
-plt.title(r't=%iM, $\phi=%0.2f^\circ$'%(t[i_dump], phi))
-plt.savefig('plots_mayank/test_%04d.png'%i_dump)
-phi0 = phi
-c=c+1
-    
 
-# NEW TRACKING
+
+
+
+
+# NEW OUTFLOW TRACKING
 a=0
 rplus = 1 + np.sqrt(1 - a**2)
 theta = np.linspace(0, 2*np.pi, 1000)
@@ -1283,11 +1195,12 @@ for i_dump in range(6038, 6075):
     uu_ks = cks_vec_to_ks(uu,x,y,z,0,0,a)
     vr_slice = (uu_ks[1]/uu_ks[0])[:,:,64]
     vr_slice[maskbh] = vr_slice.min()
-    mask_vr = (vr_slice>0) & (rr<=2.5*rplus)
+    mask_vr = (vr_slice>0) & (rr<=3*rplus)
 
     plt.figure()
     plt.pcolormesh(r_slice, z_slice, vr_slice, cmap='bwr', vmin=-0.2, vmax=0.2)
     plt.colorbar(label=r'$v^r$')
+    plt.streamplot(r_slice.transpose(), z_slice.transpose(), Bcc1[:,:,64].transpose(), Bcc2[:,:,64].transpose(), color='black', linewidth=0.5, density=2, arrowsize=0.5)
     plt.fill(xh,yh,'k', zorder=20)
 
     potential = np.array([])
@@ -1339,7 +1252,7 @@ for i_dump in range(6038, 6075):
             ends = [node for node, degree in deg.items() if degree == 1]
             r_s, z_s = r_slice[sk], z_slice[sk]
             rr_s = np.sqrt(r_s**2 + z_s**2)
-            end_idx = np.where(rr_s[ends] < np.mean(rr_s[ends]))
+            end_idx = np.where(rr_s[ends] <= np.mean(rr_s[ends]))
             if end_idx[0].size == 1:
                 idx = np.argmin(rr[labeled_v == i])
                 r_v, z_v = r_slice[labeled_v == i][idx], z_slice[labeled_v == i][idx]
@@ -1416,22 +1329,28 @@ for i_dump in range(6038, 6075):
     act_idx_sort2 = np.argsort([act['phi'] for act in active2])
     potential2 = potential.copy()
 
+    print(active)
+    print(act_idx_sort)
+    print(potential.tolist())
+    print(potential_t.tolist())
+
     for a_idx in act_idx_sort2:
         if active2[a_idx] not in active:
             continue
         diff = potential - active2[a_idx]['phi']
         diff[diff < 0] = diff[diff < 0] + 360
         matches_a = diff[diff<=20].size
-        if matches_a == 0 or (matches_a > 1 and active2[a_idx]['t'] == False and potential[np.argmin(diff)] in potential_t):
+        if matches_a == 0:
             active.remove(active2[a_idx])
-            act_idx_sort = np.argsort([act['phi'] for act in active])
-        elif matches_a > 1 and (active2[a_idx]['t'] == True or (active2[a_idx]['t'] == False and potential[np.argmin(diff)] not in potential_t)):
-            if a_idx == act_idx_sort[0] and 360 + potential[np.argmin(diff)] - active[act_idx_sort[-1]]['phi']<20 and potential[(potential<active[a_idx]['phi']) ^ (potential>active[act_idx_sort[-1]]['phi'])].size == 0:
-                active[act_idx_sort[-1]]['phi'] = potential[np.argmin(diff)]
+            act_idx_sort = np.delete(act_idx_sort, np.where(act_idx_sort==a_idx))
+            # act_idx_sort = np.argsort([act['phi'] for act in active])
+        elif matches_a > 1:
+            if a_idx == act_idx_sort2[0] and 360 + potential[np.argmin(diff)] - active[act_idx_sort2[-1]]['phi']<20 and potential[(potential<active2[a_idx]['phi']) ^ (potential>active2[act_idx_sort2[-1]]['phi'])].size == 0:
+                active[act_idx_sort2[-1]]['phi'] = potential[np.argmin(diff)]
                 if potential[np.argmin(diff)] in potential_t:
-                    active[act_idx_sort[-1]]['t'] = True
+                    active[act_idx_sort2[-1]]['t'] = True
                 else:                    
-                    active[act_idx_sort[-1]]['t'] = False
+                    active[act_idx_sort2[-1]]['t'] = False
                 potential_t = np.delete(potential_t, np.where(potential_t == potential[np.argmin(diff)]))
                 potential = np.delete(potential, np.argmin(diff))
                 diff = np.delete(diff, np.argmin(diff))
@@ -1450,7 +1369,8 @@ for i_dump in range(6038, 6075):
     for pot in potential2:
         if pot not in potential:
             continue
-        diff = pot - np.array([active[idx]['phi'] for idx in act_idx_sort])
+        print(np.array([active2[idx]['phi'] for idx in act_idx_sort]))
+        diff = pot - np.array([active2[idx]['phi'] for idx in act_idx_sort])
         diff[diff < 0] = diff[diff < 0] + 360
         matches_p = diff[diff<=20].size
         if matches_p == 0:
@@ -1459,55 +1379,49 @@ for i_dump in range(6038, 6075):
                 active.append({'phi': pot , 'outflow_idx': outflow_idx, 't': True, 'color':colors[(outflow_idx-1)%len(colors)]})
                 potential_t = np.delete(potential_t, np.where(potential_t == pot))
             potential = np.delete(potential, np.where(potential == pot))
-        elif matches_p > 0 and (pot not in potential_t or (pot in potential_t and active[act_idx_sort[np.argmin(diff)]]['t'] == True)):
-            active[act_idx_sort[np.argmin(diff)]]['phi'] = pot
+        elif matches_p > 0:
+            target = active2[act_idx_sort[np.argmin(diff)]]
+            idx = next(i for i, a in enumerate(active) if a is target or a == target)
+            active[idx]['phi'] = pot
             if pot in potential_t:
-                active[act_idx_sort[np.argmin(diff)]]['t'] = True
+                active[idx]['t'] = True
             else:
-                active[act_idx_sort[np.argmin(diff)]]['t'] = False
+                active[idx]['t'] = False
             potential_t = np.delete(potential_t, np.where(potential_t == pot))
             potential = np.delete(potential, np.where(potential == pot))
             act_idx_sort = np.delete(act_idx_sort, np.argmin(diff))
-        else:
-            outflow_idx = outflow_idx + 1
-            active.remove(active[act_idx_sort[np.argmin(diff)]])
-            act_idx_sort = np.delete(act_idx_sort, np.argmin(diff))
-            active.append({'phi': pot , 'outflow_idx': outflow_idx, 't': True, 'color':colors[(outflow_idx-1)%len(colors)]})
-            potential_t = np.delete(potential_t, np.where(potential_t == pot))
-            potential = np.delete(potential, np.where(potential == pot))
 
     if act_idx_sort.size > 0:
         for a_idx in act_idx_sort:
-            del active[idx]
-    
-    # print(active)
-    # print(act_idx_sort)
-    # print(potential.tolist())
-    # print(potential_t.tolist())
+            del active[a_idx]
+
+    print(active)
+    print(act_idx_sort)
+    print(potential.tolist())
+    print(potential_t.tolist())
 
     for act in active:
         x_l = np.linspace(0,10*np.cos(np.radians(act['phi'])),6)
-        plt.plot(x_l, np.tan(np.radians(act['phi']))*x_l, color=act['color'], ls='--', linewidth=1, zorder=10, label='Outflow %d'%act['outflow_idx'])
+        plt.plot(x_l, np.tan(np.radians(act['phi']))*x_l, color=act['color'], ls='--', linewidth=2, zorder=10, label='Outflow %d'%act['outflow_idx'])
     plt.xlabel(r'$x/r_G$')
     plt.ylabel(r'$y/r_G$')
     plt.title(r't=%iM, $n=%i$, T=%i'%(t[i_dump], len(active), outflow_idx))
-    plt.savefig('plots_mayank/test_%04d.png'%i_dump)
+    plt.savefig('plots_mayank/tracked_midplane_6038_6074/test_%04d.png'%i_dump)
     angles[t[i_dump]] = {entry['outflow_idx']: (float(entry['phi']), bool(entry['t'])) for entry in active}
 
+pickle.dump(angles, open('angles_6038_6075.pkl', 'wb'))
+angles = pickle.load(open('angles_6038_6075.pkl', 'rb'))
 
-pickle.dump(angles, open('angles.pkl', 'wb'))
-angles = pickle.load(open('angles.pkl', 'rb'))
-
-outflow_lengths = np.zeros(34)
+outflow_lengths = np.zeros(outflow_idx)
 for t0 in angles.keys():
     for i in angles[t0].keys():
         outflow_lengths[i-1] = outflow_lengths[i-1] + 1
 avoid = np.where(outflow_lengths <= 2)[0]
-valid_ids = np.array([i+1 for i in range(34) if i not in avoid])
+valid_ids = np.array([i+1 for i in range(outflow_idx) if i not in avoid])
 
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(tight_layout=True)
 cmap = plt.cm.hsv
-# norm = plt.Normalize(vmin=t[6038], vmax=t[6074])
+# norm = plt.Normalize(vmin=t[6089], vmax=t[6109])
 norm = plt.Normalize(vmin=1, vmax=len(valid_ids))
 for t0 in angles.keys():
     # color = color=cmap(norm(t0))
@@ -1528,54 +1442,10 @@ for t0 in angles.keys():
 sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
 sm.set_array([])
 plt.colorbar(sm, ax=ax, label='Time (M)')
-for i in range(1,34):
+for i in range(1,outflow_idx+1):
     plt.plot(i*np.cos(theta), i*np.sin(theta), color='black', alpha=0.25, ls='--', zorder=1)
 
 
-
-
-# plt.figure()
-# plt.pcolormesh(r_slice, z_slice, vr_slice, cmap='managua', vmin=-0.2, vmax=0.2)
-# plt.colorbar(label=r'$v^r$')
-plt.pcolormesh(r_slice, z_slice, np.log10(temp_slice), cmap='viridis', vmin=-1, vmax=0)
-plt.colorbar(label=r'$\log_{10}(T)$')
-
-
-
-phi0 = -45
-
-for i in range(1,num+1):
-    [n]=np.where(rr[labeled==i]==rr[labeled==i].min())
-    if len(n)==1:
-        [n0] = n
-        r_c, z_c = r_slice[labeled==i][n0], z_slice[labeled==i][n0]
-        x_l = np.sign(r_c)* np.linspace(0,np.abs(2*r_c),6)
-        angle.append(np.arctan2(z_c,r_c)*180/np.pi)
-        plt.plot(x_l, z_c/r_c*x_l, color='black', ls='--', linewidth=1, zorder=10)
-    else:
-        for n0 in n:
-            r_c, z_c = r_slice[labeled==i][n0], z_slice[labeled==i][n0]
-            x_l = np.sign(r_c)* np.linspace(0,np.abs(2*r_c),6)
-            angle.append(np.arctan2(z_c,r_c)*180/np.pi)
-            plt.plot(x_l, z_c/r_c*x_l, color='black', ls='--', linewidth=1, zorder=10)
-diff = np.abs(np.array(angle) - phi0)
-for i in range(len(diff)):
-    if diff[i] > 180:
-        diff[i] = 360 - diff[i]
-print(angle)
-print(angle[np.where(diff == np.min(diff[np.array(angle)-phi0 > 0]))[0][0]])
-temp = []
-for j in angle:
-    rho_slice, coords, r_slice, z_slice = slice(rho, np.cos(np.pi*j/180), np.sin(np.pi*j/180), 10)
-    press_slice = slice(press, np.cos(np.pi*j/180), np.sin(np.pi*j/180), 10)[0]
-    temp_slice = press_slice/rho_slice
-    rr = np.sqrt(r_slice**2 + z_slice**2)
-    maskbh = rr<rplus
-    temp_slice2 = np.copy(temp_slice)
-    temp_slice2[maskbh] = temp_slice2.min()
-    mask_t = temp_slice2>1
-    temp.append(np.sum(mask_t))
-plt.savefig('plots_mayank/test.png')
 
 
 
